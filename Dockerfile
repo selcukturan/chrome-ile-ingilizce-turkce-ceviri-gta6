@@ -25,6 +25,7 @@ COPY --from=builder /app/package.json ./package.json
 RUN mkdir -p /app/data && chown -R node:node /app/data
 USER node
 EXPOSE 4446
+# Port, PORT değişkeninden okunur (Coolify PORT'u ezerse healthcheck de ona uyar)
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD wget -q --spider http://127.0.0.1:4446/robots.txt || exit 1
+  CMD wget -q --spider "http://127.0.0.1:${PORT}/robots.txt" || exit 1
 CMD ["node", "build"]
