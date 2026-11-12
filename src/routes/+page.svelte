@@ -6,7 +6,7 @@
 	import { cevir, cevirmenHazirla } from '#lib/ceviri.ts';
 	import { imzaFarki, kareIsle, type AltyaziTipi, type Bolge, type Kutu } from '#lib/goruntu.ts';
 	import { tekrarMi } from '#lib/metin.ts';
-	import { hazirla } from '#lib/islem.ts';
+	import { baglamla, hazirla, konusmaMi, type Asamalar } from '#lib/islem.ts';
 	import { parcalara, SabitFiltre, type OcrSatir } from '#lib/ocr.ts';
 	import { yazimSozluguYukle } from '#lib/yazim.ts';
 	import { argoKuralSayisi } from '#lib/argo.ts';
@@ -20,7 +20,7 @@
 	const varsayilan = {
 		tip: 'white' as AltyaziTipi,
 		esik: 190,
-		aralik: 400,
+		aralik: 200,
 		minGuven: 55,
 		yazim: true,
 		argo: true,
@@ -183,6 +183,7 @@
 	let isci: Worker | null = null;
 	let sonImza: number[] | null = null,
 		bekleyenImza: number[] | null = null,
+		sonAnlatim: (Asamalar & { zaman: number }) | null = null, // ekranlara bölünen cümleler için
 		sonMetin = '',
 		bosBaslangic = 0,
 		zamanlayici: ReturnType<typeof setTimeout> | undefined;
@@ -274,12 +275,25 @@
 		}
 		sonMetin = ingilizce;
 		sabit.ogren(p.kelimeler);
+
+		// Önceki ekrandan devam eden anlatım cümlesi varsa birlikte çevrilir
+		const simdi = Date.now();
+		const gosterilecek = asamalar.map((a) => {
+			if (konusmaMi(a)) return a;
+			const b = baglamla(sonAnlatim, a, simdi);
+			sonAnlatim = { ...b, zaman: simdi };
+			return b;
+		});
 		try {
 			// Parçalar (anlatıcı + diyalog gibi) ayrı ayrı ve aynı anda çevrilir
-			const ceviriler = await Promise.all(asamalar.map((a) => cevir(a.cevrilecek)));
+			const ceviriler = await Promise.all(gosterilecek.map((a) => cevir(a.cevrilecek)));
 			istat.ceviri++;
 			if (ingilizce === sonMetin)
-				goster(ingilizce, ceviriler.join('\n'), asamalar.map((a) => a.cevrilecek).join('\n'));
+				goster(
+					gosterilecek.map((a) => a.duzeltilmis).join('\n'),
+					ceviriler.join('\n'),
+					gosterilecek.map((a) => a.cevrilecek).join('\n')
+				);
 			sure = { ocr: Math.round(t1 - t0), ceviri: Math.round(performance.now() - t1) };
 			bildir(`Çalışıyor · OCR güveni %${Math.round(p.guven)}`, 'ok');
 		} catch (e) {
@@ -311,6 +325,7 @@
 			calisiyor = true;
 			sonImza = null;
 			bekleyenImza = null;
+			sonAnlatim = null;
 			sonMetin = '';
 			istat = bosIstatistik();
 			bildir('Çalışıyor…', 'ok');

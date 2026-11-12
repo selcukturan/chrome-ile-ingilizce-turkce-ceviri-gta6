@@ -289,7 +289,31 @@ function harfDuzeni(metin: string): string {
 		});
 		return cumleDuzeni(kucult);
 	}
-	return metin;
+	return ortaBuyukDuzelt(metin);
+}
+
+// Cümle ortasında büyük harfle okunan, isim olamayacak kelimeler (OCR font hatası):
+// "decide Just how honorable Arthur Is" → "decide just how honorable Arthur is"
+const ISIM_OLMAYAN = new Set(
+	`a an the and or but nor so yet if then than as at by for from in into of on onto to with
+without about after before over under up down out off is are was were be been being am do does
+did done have has had will would shall should can could might must it it's its you you're you've
+you'll your yours he he's him his she she's her we we're we've us our they they're they've them
+their me my mine this that that's these those there there's here what what's who whom which when
+where why how not no just now all some any every each very too also only ain't don't didn't
+doesn't isn't wasn't aren't weren't can't won't couldn't wouldn't shouldn't let's get got go going
+gonna wanna`.split(/\s+/)
+);
+
+function ortaBuyukDuzelt(metin: string): string {
+	return metin.replace(/[A-Z][a-z']*/g, (w, i: number) => {
+		const k = w.toLowerCase();
+		if (!ISIM_OLMAYAN.has(k)) return w;
+		const once = metin.slice(0, i).trimEnd();
+		// cümle başı (metin başı, . ! ? sonrası, parantez/tırnak/tire açılışı) korunur
+		if (!once || /[.!?(\-–—"']$/.test(once)) return w;
+		return k;
+	});
 }
 
 // OCR "I" harfini sık sık "1" okur: "1 am", "1'm", "(1 think"

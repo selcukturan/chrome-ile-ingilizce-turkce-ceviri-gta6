@@ -76,6 +76,26 @@ export type Parcalar = {
 
 const CUMLE_SONU = /[.!?…)"]$/;
 const YENI_KONUSMA = /^[([\-–—"]/;
+const BOSLUK_KAT = 2.5; // satır yüksekliğinin kaç katı boşluk ayrı bir yazı grubu sayılsın
+
+const harfSayisi = (s: string) => (s.match(/[A-Za-z]/g) || []).length;
+const parantezAcik = (s: string) => (s.match(/\(/g) || []).length > (s.match(/\)/g) || []).length;
+
+/** Aynı satırda büyük boşlukla ayrılmış küçük grupları (köşedeki logo, "KK 4 HD") atar. */
+function gruplariSuz(kelimeler: OcrKelime[]): OcrKelime[] {
+	if (kelimeler.length < 2) return kelimeler;
+	const yukseklikler = kelimeler.map((k) => k.bbox.y1 - k.bbox.y0).sort((a, b) => a - b);
+	const esik = yukseklikler[yukseklikler.length >> 1] * BOSLUK_KAT;
+	const gruplar: OcrKelime[][] = [[kelimeler[0]]];
+	for (let i = 1; i < kelimeler.length; i++) {
+		if (kelimeler[i].bbox.x0 - kelimeler[i - 1].bbox.x1 > esik) gruplar.push([]);
+		gruplar[gruplar.length - 1].push(kelimeler[i]);
+	}
+	if (gruplar.length === 1) return kelimeler;
+	const harf = gruplar.map((g) => harfSayisi(g.map((k) => k.text).join('')));
+	const enBuyuk = Math.max(...harf);
+	return gruplar.filter((_, i) => harf[i] >= 8 || harf[i] >= enBuyuk * 0.5).flat();
+}
 
 export function parcalara(satirlar: OcrSatir[], filtre?: SabitFiltre): Parcalar {
 	const kelimeler: OcrKelime[] = [];
@@ -84,24 +104,36 @@ export function parcalara(satirlar: OcrSatir[], filtre?: SabitFiltre): Parcalar 
 		sayi = 0;
 
 	for (const s of satirlar) {
-		const kalan: string[] = [];
+		const kalan: OcrKelime[] = [];
 		for (const k of s.words) {
 			kelimeler.push(k);
 			if (k.confidence < KELIME_MIN_GUVEN || filtre?.sabitMi(k)) continue;
-			kalan.push(k.text);
+			kalan.push(k);
+		}
+		const suzulmus = gruplariSuz(kalan);
+		for (const k of suzulmus) {
 			toplam += k.confidence;
 			sayi++;
 		}
-		const metin = kalan.join(' ').trim();
+		const metin = suzulmus
+			.map((k) => k.text)
+			.join(' ')
+			.trim();
 		if (metin) temizSatirlar.push(metin);
 	}
 
-	// Satırları birleştir: önceki satır cümle sonuyla bitmiyorsa ve yeni satır yeni bir
-	// konuşma ("(", "-", tırnak) başlatmıyorsa aynı cümlenin devamıdır.
+	// Satırları birleştir:
+	//  - açık parantez kapanmadıysa aynı konuşmanın devamıdır,
+	//  - önceki satır cümle sonuyla bitmiyorsa ve yeni satır yeni bir konuşma
+	//    ("(", "-", tırnak) başlatmıyorsa aynı cümlenin devamıdır.
 	const parcalar: string[] = [];
 	for (const satir of temizSatirlar) {
 		const son = parcalar.length - 1;
-		if (son >= 0 && !CUMLE_SONU.test(parcalar[son]) && !YENI_KONUSMA.test(satir))
+		const onceki = parcalar[son];
+		if (
+			son >= 0 &&
+			(parantezAcik(onceki) || (!CUMLE_SONU.test(onceki) && !YENI_KONUSMA.test(satir)))
+		)
 			parcalar[son] += ' ' + satir;
 		else parcalar.push(satir);
 	}

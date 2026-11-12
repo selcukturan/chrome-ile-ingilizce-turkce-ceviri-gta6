@@ -361,3 +361,22 @@ once and for all = forever
 feller = guy
 wanna = want to
 gonna = going to
+hold still = don't move
+clear out = get out
+shoo = go away
+sharp shooting = marksmanship
+sharpshooting = marksmanship
+senior gun = senior gunman
+
+# "ain't" bağlama göre am/is/are not anlamına gelir; sadece kesin kalıplar:
+ain't this = isn't this
+ain't that = isn't that
+ain't it = isn't it
+I ain't = I am not
+you ain't = you are not
+we ain't = we are not
+they ain't = they are not
+he ain't = he is not
+she ain't = she is not
+it ain't = it is not
+that ain't = that is not
