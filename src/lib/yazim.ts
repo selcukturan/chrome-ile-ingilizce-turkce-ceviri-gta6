@@ -257,9 +257,50 @@ function kelimeDuzelt(w: string, cumleBasi: boolean): string {
 }
 
 // ---------- metin ----------
+// ---------- büyük/küçük harf düzeni ----------
+// "(1 AM HAPPY)" ve "In The Late 1800s America Was Evolving." gibi metinler hem yazım
+// düzeltmeyi (büyük harfli kelime = isim sayılır) hem de çevirmeni şaşırtır.
+// Bunlar normal cümle düzenine çevrilir; korunan kelimeler büyük harfle başlar.
+function cumleDuzeni(metin: string): string {
+	return metin
+		.replace(/(^|[.!?]\s+|^[("'\-–—]\s*)([a-z])/g, (_, on, h) => on + h.toUpperCase())
+		.replace(/\bi(?=\b|')/g, 'I');
+}
+
+function harfDuzeni(metin: string): string {
+	const kelimeler = metin.match(/[A-Za-z][A-Za-z']*/g) ?? [];
+	const harfler = kelimeler.join('');
+	if (harfler.length < 4) return metin;
+
+	const korunanBuyuk = (w: string) =>
+		korunan.has(w.toLowerCase()) ? w[0].toUpperCase() + w.slice(1).toLowerCase() : w;
+
+	// TAMAMI BÜYÜK HARF
+	if (!/[a-z]/.test(harfler)) {
+		return cumleDuzeni(metin.toLowerCase()).replace(/[A-Za-z][A-Za-z']*/g, korunanBuyuk);
+	}
+	// Her Kelimenin Baş Harfi Büyük (en az 3 kelimenin %70'i)
+	const uzun = kelimeler.filter((w) => w.length >= 2);
+	const buyuk = uzun.filter((w) => /^[A-Z]/.test(w));
+	if (uzun.length >= 3 && buyuk.length / uzun.length >= 0.7) {
+		const kucult = metin.replace(/[A-Za-z][A-Za-z']*/g, (w) => {
+			const k = w.toLowerCase();
+			return frekans!.has(k) && !korunan.has(k) ? k : w;
+		});
+		return cumleDuzeni(kucult);
+	}
+	return metin;
+}
+
+// OCR "I" harfini sık sık "1" okur: "1 am", "1'm", "(1 think"
+const BIR_I =
+	/(^|[\s("'\-])1(?=\s+(?:am|was|will|have|had|think|know|can|can't|don't|didn't|did|do|need|want|got|just|never|swear|love|mean|guess|said|told|thought|wanna|gotta|ain't|would|could|should|must|really|hope|see|saw|told|feel|got)\b)/gi;
+const BIR_I_KISALTMA = /(^|[\s("'\-])1'(m|ll|ve|d)\b/gi;
+
 export function yazimDuzelt(metin: string): string {
 	if (!frekans) return metin;
 	metin = metin.replace(/！/g, '!').replace(/？/g, '?').replace(/，/g, ',');
+	metin = harfDuzeni(metin).replace(BIR_I, '$1I').replace(BIR_I_KISALTMA, "$1I'$2");
 	let out = '',
 		pos = 0,
 		cumleBasi = true;

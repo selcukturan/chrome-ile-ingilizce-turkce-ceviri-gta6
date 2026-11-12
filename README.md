@@ -9,8 +9,10 @@ altyazıları **Chrome'un yerleşik çevirmeniyle** İngilizceden Türkçeye çe
 ## İşlem hattı
 
 ```
-kamera karesi → bölge kesme + eşikleme → Tesseract OCR
-  → temizleme → yazım düzeltme (korunan kelimelere dokunmaz)   ← ekranda gösterilen İngilizce
+kamera karesi → bölge kesme + eşikleme → görüntü durulunca → yazı kutusunu Tesseract OCR
+  → düşük güvenli ve sabit (logo/filigran) kelimeleri atma → satırları parçalara ayırma
+  → temizleme → büyük harf düzeni + yazım düzeltme (korunan kelimelere dokunmaz)
+                                                               ← ekranda gösterilen İngilizce
   → argo sadeleştirme                                          ← çevirmene giden İngilizce
   → Chrome yerleşik çevirmeni (cihaz üstünde) → Türkçe
 ```
@@ -93,16 +95,17 @@ Alan adını **Domain property** olarak ekleyin (doğrulama TXT kaydını Cloudf
 
 ## Yapı
 
-| Dosya                             | Görev                                                  |
-| --------------------------------- | ------------------------------------------------------ |
-| `src/routes/+page.svelte`         | Arayüz, kamera, bölge seçimi, OCR döngüsü, SEO içeriği |
-| `src/lib/tarayici.ts`             | Masaüstü Chrome 138+ kontrolü                          |
-| `src/lib/goruntu.ts`              | Kare ön işleme (eşikleme) ve değişiklik tespiti        |
-| `src/lib/islem.ts`                | OCR metni → yazım → argo işlem hattı                   |
-| `src/lib/yazim.ts`                | OCR yazım düzeltme                                     |
-| `src/lib/argo.ts`                 | Argo sözlüğü motoru                                    |
-| `src/lib/ceviri.ts`               | Chrome yerleşik çevirmeni (Translator API)             |
-| `src/lib/site.ts`                 | Alan adı, başlık ve açıklama (SEO)                     |
-| `src/lib/server/sayac.ts`         | JSON dosyalı ziyaretçi sayacı                          |
-| `src/routes/api/sayac/+server.ts` | Sayaç API'si                                           |
-| `Dockerfile`                      | Coolify için üretim imajı                              |
+| Dosya                             | Görev                                                                |
+| --------------------------------- | -------------------------------------------------------------------- |
+| `src/routes/+page.svelte`         | Arayüz, kamera, bölge seçimi, OCR döngüsü, SEO içeriği               |
+| `src/lib/tarayici.ts`             | Masaüstü Chrome 138+ kontrolü                                        |
+| `src/lib/goruntu.ts`              | Kare ön işleme (eşikleme) ve değişiklik tespiti                      |
+| `src/lib/ocr.ts`                  | Kelime filtreleri, sabit yazı (logo/filigran) tespiti, satır → parça |
+| `src/lib/islem.ts`                | OCR metni → yazım → argo işlem hattı                                 |
+| `src/lib/yazim.ts`                | OCR yazım düzeltme                                                   |
+| `src/lib/argo.ts`                 | Argo sözlüğü motoru                                                  |
+| `src/lib/ceviri.ts`               | Chrome yerleşik çevirmeni (Translator API)                           |
+| `src/lib/site.ts`                 | Alan adı, başlık ve açıklama (SEO)                                   |
+| `src/lib/server/sayac.ts`         | JSON dosyalı ziyaretçi sayacı                                        |
+| `src/routes/api/sayac/+server.ts` | Sayaç API'si                                                         |
+| `Dockerfile`                      | Coolify için üretim imajı                                            |

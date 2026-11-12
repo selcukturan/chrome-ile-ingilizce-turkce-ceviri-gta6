@@ -4,9 +4,10 @@
 	import Sayac from '#lib/components/Sayac.svelte';
 	import { MIN_CHROME_SURUMU, tarayiciKontrol, type TarayiciDurumu } from '#lib/tarayici.ts';
 	import { cevir, cevirmenHazirla } from '#lib/ceviri.ts';
-	import { imzaFarki, kareIsle, type AltyaziTipi, type Bolge } from '#lib/goruntu.ts';
-	import { benzerlik } from '#lib/metin.ts';
+	import { imzaFarki, kareIsle, type AltyaziTipi, type Bolge, type Kutu } from '#lib/goruntu.ts';
+	import { tekrarMi } from '#lib/metin.ts';
 	import { hazirla } from '#lib/islem.ts';
+	import { parcalara, SabitFiltre, type OcrSatir } from '#lib/ocr.ts';
 	import { yazimSozluguYukle } from '#lib/yazim.ts';
 	import { argoKuralSayisi } from '#lib/argo.ts';
 	import { oku, yaz } from '#lib/depo.ts';
@@ -39,6 +40,17 @@
 	let tr = $state('');
 	let en = $state('');
 	let sure = $state({ ocr: 0, ceviri: 0 });
+	// Tarama istatistikleri: optimizasyonların etkisini görmek için
+	const bosIstatistik = () => ({
+		tur: 0,
+		bekleme: 0,
+		ocr: 0,
+		tekrar: 0,
+		dusuk: 0,
+		ceviri: 0,
+		ocrMs: 0
+	});
+	let istat = $state(bosIstatistik());
 	type Kayit = { tr: string; en: string; giden: string };
 	let gecmis = $state<Kayit[]>([]);
 	let buyukGorunum = $state(false);
@@ -140,6 +152,7 @@
 		yaz('bolge', bolge);
 		bolgeCiz();
 		sonImza = null;
+		sabit.sifirla();
 	}
 
 	// ---------- Gösterim ----------
@@ -169,9 +182,16 @@
 	// ---------- OCR + ana döngü ----------
 	let isci: Worker | null = null;
 	let sonImza: number[] | null = null,
+		bekleyenImza: number[] | null = null,
 		sonMetin = '',
 		bosBaslangic = 0,
 		zamanlayici: ReturnType<typeof setTimeout> | undefined;
+	const sabit = new SabitFiltre();
+
+	// Sadece kullandığımız çıktılar (hOCR/TSV üretimi kapatılır)
+	const CIKTI = { text: false, blocks: true, hocr: false, tsv: false };
+	// Görüntü değişince tekrar bakma süresi: altyazı tam belirene (fade-in) kadar bekler
+	const DURULMA_MS = 80;
 
 	async function isciHazirla() {
 		if (isci) return isci;
@@ -192,9 +212,11 @@
 	async function tarama() {
 		if (!calisiyor || !isci || !isTuvali) return;
 		const t0 = performance.now();
+		let hizli = false;
 		try {
 			const kare = kareIsle(video, bolge, ayar.esik, ayar.tip, isTuvali, onizleme);
 			if (kare) {
+				istat.tur++;
 				if (kare.murekkep < 0.003) {
 					// Bölge boş: altyazı kaybolmuş
 					if (sonMetin && !bosBaslangic) bosBaslangic = Date.now();
@@ -204,24 +226,18 @@
 						bosBaslangic = 0;
 					}
 					sonImza = kare.imza;
+					bekleyenImza = null;
 				} else if (imzaFarki(kare.imza, sonImza) > 4) {
 					bosBaslangic = 0;
-					sonImza = kare.imza;
-					const { data } = await isci.recognize(isTuvali);
-					const t1 = performance.now();
-					const a = hazirla(data.text, ayar);
-					const harf = (a.ocr.match(/[A-Za-z]/g) || []).length;
-					if (harf >= 3 && data.confidence >= ayar.minGuven && benzerlik(a.ocr, sonMetin) < 0.85) {
-						sonMetin = a.ocr;
-						try {
-							const ceviri = await cevir(a.cevrilecek);
-							if (a.ocr === sonMetin) goster(a.duzeltilmis, ceviri, a.cevrilecek);
-							sure = { ocr: Math.round(t1 - t0), ceviri: Math.round(performance.now() - t1) };
-							bildir(`Çalışıyor · OCR güveni %${Math.round(data.confidence)}`, 'ok');
-						} catch (e) {
-							bildir('Çeviri hatası: ' + (e as Error).message, 'warn');
-							goster(a.duzeltilmis, '');
-						}
+					if (!bekleyenImza || imzaFarki(kare.imza, bekleyenImza) > 3) {
+						// Görüntü hâlâ değişiyor (altyazı beliriyor/kayboluyor): biraz sonra tekrar bak
+						bekleyenImza = kare.imza;
+						istat.bekleme++;
+						hizli = true;
+					} else {
+						bekleyenImza = null;
+						sonImza = kare.imza;
+						await yaziOku(kare.kutu, t0);
 					}
 				}
 			}
@@ -229,8 +245,47 @@
 			bildir('Hata: ' + (e as Error).message, 'warn');
 			console.error(e);
 		}
-		if (calisiyor)
-			zamanlayici = setTimeout(tarama, Math.max(30, ayar.aralik - (performance.now() - t0)));
+		if (calisiyor) {
+			const bekle = hizli ? DURULMA_MS : ayar.aralik - (performance.now() - t0);
+			zamanlayici = setTimeout(tarama, Math.max(30, bekle));
+		}
+	}
+
+	async function yaziOku(kutu: Kutu, t0: number) {
+		const { data } = await isci!.recognize(isTuvali!, { rectangle: kutu }, CIKTI);
+		const t1 = performance.now();
+		istat.ocr++;
+		istat.ocrMs += t1 - t0;
+
+		const p = parcalara(data.lines as unknown as OcrSatir[], sabit);
+		const asamalar = p.parcalar
+			.map((x) => hazirla(x, ayar))
+			.filter((a) => /[A-Za-z].*[A-Za-z]/.test(a.duzeltilmis));
+		const ingilizce = asamalar.map((a) => a.duzeltilmis).join('\n');
+		const harf = (ingilizce.match(/[A-Za-z]/g) || []).length;
+
+		if (harf < 3 || p.guven < ayar.minGuven) {
+			istat.dusuk++;
+			return;
+		}
+		if (tekrarMi(ingilizce, sonMetin)) {
+			istat.tekrar++;
+			return;
+		}
+		sonMetin = ingilizce;
+		sabit.ogren(p.kelimeler);
+		try {
+			// Parçalar (anlatıcı + diyalog gibi) ayrı ayrı ve aynı anda çevrilir
+			const ceviriler = await Promise.all(asamalar.map((a) => cevir(a.cevrilecek)));
+			istat.ceviri++;
+			if (ingilizce === sonMetin)
+				goster(ingilizce, ceviriler.join('\n'), asamalar.map((a) => a.cevrilecek).join('\n'));
+			sure = { ocr: Math.round(t1 - t0), ceviri: Math.round(performance.now() - t1) };
+			bildir(`Çalışıyor · OCR güveni %${Math.round(p.guven)}`, 'ok');
+		} catch (e) {
+			bildir('Çeviri hatası: ' + (e as Error).message, 'warn');
+			goster(ingilizce, '');
+		}
 	}
 
 	async function baslatDurdur() {
@@ -255,7 +310,9 @@
 			]);
 			calisiyor = true;
 			sonImza = null;
+			bekleyenImza = null;
 			sonMetin = '';
+			istat = bosIstatistik();
 			bildir('Çalışıyor…', 'ok');
 			tarama();
 		} catch (e) {
@@ -387,6 +444,16 @@
 			</div>
 			{#if sure.ocr}
 				<p class="ipucu sure">Son altyazı: OCR {sure.ocr} ms · çeviri {sure.ceviri} ms</p>
+			{/if}
+			{#if istat.tur}
+				<p
+					class="ipucu sure"
+					title="Tarama: kare kontrolü · Bekleme: görüntü durulana kadar · OCR: yazı okuma · Tekrar/düşük: okunan ama çevrilmeyen"
+				>
+					{istat.tur} tarama · {istat.bekleme} bekleme · {istat.ocr} OCR (ort. {istat.ocr
+						? Math.round(istat.ocrMs / istat.ocr)
+						: 0} ms) · {istat.tekrar} tekrar · {istat.dusuk} düşük güven · {istat.ceviri} çeviri
+				</p>
 			{/if}
 		</section>
 
@@ -604,6 +671,13 @@
 		flex-direction: column;
 		justify-content: center;
 		gap: 8px;
+	}
+	.tr,
+	.en,
+	.buyuk span,
+	.gecmis span,
+	.gecmis small {
+		white-space: pre-line;
 	}
 	.tr {
 		font-size: 34px;

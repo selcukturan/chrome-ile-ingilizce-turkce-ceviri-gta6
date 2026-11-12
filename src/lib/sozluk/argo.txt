@@ -348,3 +348,16 @@ take out the guards = neutralize the guards
 jerking off = masturbating
 jerk off = masturbate
 jerked off = masturbated
+
+
+# ---------------------------------------------------------------------------
+#  12) DEYİMLER (kelimesi kelimesine çevrilince anlamsızlaşanlar)
+# ---------------------------------------------------------------------------
+out of his hair = away from him
+out of her hair = away from her
+out of your hair = away from you
+out of my hair = away from me
+once and for all = forever
+feller = guy
+wanna = want to
+gonna = going to
