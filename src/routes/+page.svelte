@@ -27,6 +27,7 @@
 		yazim: true,
 		argo: true,
 		ingilizceGoster: true,
+		onizleme: true, // "OCR'a giden görüntü" göster/gizle
 		kamera: ''
 	};
 	let ayar = $state(oku('ayar', varsayilan));
@@ -59,7 +60,7 @@
 
 	let video = $state() as HTMLVideoElement;
 	let bolgeTuval = $state() as HTMLCanvasElement;
-	let onizleme = $state() as HTMLCanvasElement;
+	let onizleme = $state<HTMLCanvasElement | null>(null);
 	let isTuvali: HTMLCanvasElement | null = null;
 
 	const bildir = (mesaj: string, sinif = '') => (durum = { mesaj, sinif });
@@ -206,6 +207,29 @@
 		}
 	}
 
+	// ---------- "OCR'a giden görüntü" önizlemesi ----------
+	const onizlemeHedef = () => (ayar.onizleme && onizleme ? onizleme : undefined);
+
+	// OCR'a gönderilen yazı kutusunu kırmızı çerçeveyle gösterir
+	function kutuCiz(k: Kutu) {
+		const c = onizlemeHedef()?.getContext('2d');
+		if (!c) return;
+		c.strokeStyle = '#ff3b30';
+		c.lineWidth = Math.max(2, c.canvas.width / 400);
+		c.strokeRect(k.left, k.top, k.width, k.height);
+	}
+
+	// Çeviri çalışmıyorken de önizleme yenilensin (eşiği çeviriyi başlatmadan ayarlamak için)
+	$effect(() => {
+		if (!kameraAcik || calisiyor || !ayar.onizleme || !onizleme || !isTuvali) return;
+		const tuval = isTuvali;
+		const id = setInterval(() => {
+			const kare = kareIsle(video, bolge, ayar.esik, ayar.tip, tuval, onizlemeHedef());
+			if (kare) kutuCiz(kare.kutu);
+		}, 200);
+		return () => clearInterval(id);
+	});
+
 	// ---------- OCR + ana döngü ----------
 	let isci: Worker | null = null;
 	let sonImza: number[] | null = null,
@@ -247,7 +271,8 @@
 		const t0 = performance.now();
 		let hizli = false;
 		try {
-			const kare = kareIsle(video, bolge, ayar.esik, ayar.tip, isTuvali, onizleme);
+			const kare = kareIsle(video, bolge, ayar.esik, ayar.tip, isTuvali, onizlemeHedef());
+			if (kare) kutuCiz(kare.kutu);
 			if (kare) {
 				istat.tur++;
 				if (kare.murekkep < 0.003) {
@@ -495,6 +520,22 @@
 				<div class="tr">{tr || '—'}</div>
 				{#if ayar.ingilizceGoster}<div class="en">{en}</div>{/if}
 			</div>
+
+			<div class="onizleme-baslik">
+				<span class="baslik">OCR'a giden görüntü</span>
+				<button class="ikincil kucuk" onclick={() => (ayar.onizleme = !ayar.onizleme)}>
+					{ayar.onizleme ? 'Gizle' : 'Göster'}
+				</button>
+			</div>
+			{#if ayar.onizleme}
+				<canvas bind:this={onizleme} class="onizleme"></canvas>
+				<p class="ipucu">
+					Yazı <b>beyaz zemin üstünde siyah</b> ve net görünmeli; başka siyah lekeler olmamalı.
+					Olmuyorsa
+					<b>Parlaklık eşiği</b> veya <b>Altyazı tipi</b>ni değiştirin.
+					<span class="kirmizi">Kırmızı çerçeve</span>: OCR'a gönderilen alan.
+				</p>
+			{/if}
 			{#if sure.ocr}
 				<p class="ipucu sure">Son altyazı: OCR {sure.ocr} ms · çeviri {sure.ceviri} ms</p>
 			{/if}
@@ -570,13 +611,6 @@
 			<div class="satir">
 				<button class="ikincil" onclick={buyukAc}>Tam ekran çeviri</button>
 			</div>
-
-			<span class="baslik">OCR'a giden görüntü</span>
-			<canvas bind:this={onizleme} class="onizleme"></canvas>
-			<p class="ipucu">
-				Burada yazı <b>beyaz zemin üstünde siyah</b> ve net görünmeli. Görünmüyorsa eşiği veya altyazı
-				tipini değiştirin.
-			</p>
 
 			<span class="baslik">Geçmiş</span>
 			<div class="gecmis">
@@ -830,7 +864,25 @@
 		color: var(--text);
 		text-transform: none;
 	}
+	.onizleme-baslik {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		margin-top: 14px;
+	}
+	.onizleme-baslik .baslik {
+		margin: 0;
+	}
+	button.kucuk {
+		padding: 4px 12px;
+		font-size: 12px;
+	}
+	.kirmizi {
+		color: #ff3b30;
+		font-weight: 600;
+	}
 	.onizleme {
+		display: block;
 		width: 100%;
 		background: #fff;
 		border-radius: 6px;

@@ -9,6 +9,13 @@ Sürüm numarası `package.json` içindeki `version` alanıdır; sayfanın altı
 
 Numaralandırma: hata düzeltmesi → son hane (0.6.**1**), yeni özellik → orta hane (0.**7**.0).
 
+## 0.8.0 — 2026-11-13
+
+- "OCR'a giden görüntü" sol tarafa, altyazının altına taşındı; panel genişliğinde büyük gösterilir.
+- Göster/gizle düğmesi (tercih saklanır). Gizliyken önizleme çizilmez.
+- Önizleme, kamera açıkken çeviri başlatılmadan da yenilenir (eşiği önceden ayarlamak için).
+- OCR'a gönderilen yazı kutusu önizlemede kırmızı çerçeveyle gösterilir.
+
 ## 0.7.0 — 2026-11-13
 
 - "GTA" ifadeleri siteden tamamen kaldırıldı (sayfa başlığı, açıklama, paylaşım etiketleri,
