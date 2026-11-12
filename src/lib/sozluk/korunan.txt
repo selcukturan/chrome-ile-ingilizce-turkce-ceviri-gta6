@@ -2,7 +2,7 @@
 # Her satıra bir kelime. Büyük/küçük harf fark etmez.
 # Ayrıca OCR'ın bozduğu büyük harfli isimler bu listeye göre düzeltilir (Larnar → Lamar).
 
-# --- GTA V karakterleri
+# --- Oyun karakterleri
 Franklin
 Michael
 Trevor
@@ -40,7 +40,7 @@ FIB
 IAA
 LSPD
 
-# --- GTA V yerler
+# --- Oyun yerleri
 Santos
 Vinewood
 Vespucci
@@ -60,7 +60,7 @@ Alamo
 Zancudo
 Chiliad
 
-# --- GTA VI (bilinen isimler; oyun çıkınca güncelleyin)
+# --- Yeni oyun (bilinen isimler; oyun çıkınca güncelleyin)
 Lucia
 Jason
 Leonida

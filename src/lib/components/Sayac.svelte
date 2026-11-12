@@ -8,7 +8,7 @@
 		// Aynı sekmede sayfa yenilemeleri tekrar sayılmasın
 		let sayildi = false;
 		try {
-			sayildi = sessionStorage.getItem('gta6tr_sayildi') === '1';
+			sayildi = sessionStorage.getItem('altyazi_sayildi') === '1';
 		} catch {
 			/* yoksay */
 		}
@@ -17,7 +17,7 @@
 			if (!r.ok) return;
 			ist = await r.json();
 			try {
-				sessionStorage.setItem('gta6tr_sayildi', '1');
+				sessionStorage.setItem('altyazi_sayildi', '1');
 			} catch {
 				/* yoksay */
 			}

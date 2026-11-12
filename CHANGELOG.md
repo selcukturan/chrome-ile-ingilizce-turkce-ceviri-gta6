@@ -9,6 +9,14 @@ Sürüm numarası `package.json` içindeki `version` alanıdır; sayfanın altı
 
 Numaralandırma: hata düzeltmesi → son hane (0.6.**1**), yeni özellik → orta hane (0.**7**.0).
 
+## 0.7.0 — 2026-11-13
+
+- "GTA" ifadeleri siteden tamamen kaldırıldı (sayfa başlığı, açıklama, paylaşım etiketleri,
+  yapılandırılmış veri dahil). Site adı: "Altyazı Çeviri".
+- Ziyaretçi sayacı sayfanın en altına, sürüm bilgisinin yanına taşındı.
+- Sağ üste projenin GitHub bağlantısı eklendi.
+- Tarayıcıda saklanan ayarların anahtar öneki `altyazi_` oldu (eski ayarlar otomatik taşınır).
+
 ## 0.6.0 — 2026-11-13
 
 - Sürüm takibi: sayfanın altında sürüm ve commit, `/api/surum` uç noktası.

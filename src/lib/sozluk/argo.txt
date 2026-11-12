@@ -1,5 +1,5 @@
 # ============================================================================
-#  ARGO SÖZLÜĞÜ  (GTA / ABD sokak dili → çeviri modelinin anlayacağı düz İngilizce)
+#  ARGO SÖZLÜĞÜ  (Oyun / ABD sokak dili → çeviri modelinin anlayacağı düz İngilizce)
 # ============================================================================
 #  Bu dosyadaki kurallar çeviriye gitmeden ÖNCE İngilizce metne uygulanır.
 #  Ekranda gösterilen İngilizce değişmez; sadece Türkçe çeviri etkilenir.
@@ -333,7 +333,7 @@ I ran whores = I ran prostitutes
 
 
 # ---------------------------------------------------------------------------
-#  10) OYUN GÖREVLERİ (GTA hedef metinleri)
+#  10) OYUN GÖREVLERİ (hedef metinleri)
 # ---------------------------------------------------------------------------
 go to the guard = go to the security guard
 lose the cops = escape the police
