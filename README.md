@@ -47,6 +47,14 @@ npm run check           # tip denetimi
 Alan adı `src/lib/site.ts` içindeki `SITE_URL`'dedir (`altyaziceviri.tr`) (canonical, sitemap, robots.txt ve paylaşım
 etiketleri bunu kullanır).
 
+## Sürüm
+
+Sürüm `package.json` → `version`; sayfanın altında ve `https://altyaziceviri.tr/api/surum` adresinde
+görünür. Ayrıntılar ve yeni sürüm adımları: [CHANGELOG.md](CHANGELOG.md).
+
+Commit kodunun canlıda da görünmesi için Coolify'da **General → Build → "Include Source Commit in
+Build"** seçeneğini açın (Dockerfile `SOURCE_COMMIT` argümanını alır).
+
 ## Ziyaretçi sayacı
 
 `POST /api/sayac` her yeni sekme oturumunda bir ziyaret sayar, `GET /api/sayac` sadece istatistiği döndürür.

@@ -2,6 +2,8 @@
 	import { onMount, tick } from 'svelte';
 	import type { Worker } from 'tesseract.js';
 	import Sayac from '#lib/components/Sayac.svelte';
+	import KameraAyarlari from '#lib/components/KameraAyarlari.svelte';
+	import { COMMIT, DERLEME, SURUM } from '#lib/surum.ts';
 	import { MIN_CHROME_SURUMU, tarayiciKontrol, type TarayiciDurumu } from '#lib/tarayici.ts';
 	import { cevir, cevirmenHazirla } from '#lib/ceviri.ts';
 	import { imzaFarki, kareIsle, type AltyaziTipi, type Bolge, type Kutu } from '#lib/goruntu.ts';
@@ -64,6 +66,8 @@
 
 	// ---------- Kamera ----------
 	let akis: MediaStream | null = null;
+	let iz = $state.raw<MediaStreamTrack | null>(null); // kamera ayarları için aktif görüntü kaynağı
+	let yenileniyor = $state(false);
 
 	async function kameralariListele() {
 		try {
@@ -75,6 +79,24 @@
 		}
 	}
 
+	// Sonradan bağlanan cihazlar (OBS sanal kamera, capture kart) için listeyi yeniler.
+	// Kamera izni henüz verilmediyse Chrome cihaz adlarını göstermez; bu durumda izin istenir.
+	async function kameralariYenile() {
+		yenileniyor = true;
+		try {
+			await kameralariListele();
+			if (!akis && kameralar.every((k) => !k.label)) {
+				const gecici = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+				gecici.getTracks().forEach((t) => t.stop());
+				await kameralariListele();
+			}
+			bildir(`${kameralar.length} kamera bulundu.`, 'ok');
+		} catch (e) {
+			bildir('Kameralar listelenemedi: ' + (e as Error).message, 'warn');
+		}
+		yenileniyor = false;
+	}
+
 	async function kameraBaslat() {
 		if (!navigator.mediaDevices?.getUserMedia) {
 			bildir('Kameraya erişilemiyor. Sayfayı http://localhost veya https üzerinden açın.', 'warn');
@@ -82,6 +104,7 @@
 		}
 		akis?.getTracks().forEach((t) => t.stop());
 		try {
+			iz = null;
 			akis = await navigator.mediaDevices.getUserMedia({
 				video: {
 					deviceId: ayar.kamera ? { exact: ayar.kamera } : undefined,
@@ -93,7 +116,8 @@
 			video.srcObject = akis;
 			await video.play();
 			await kameralariListele();
-			const s = akis.getVideoTracks()[0].getSettings();
+			iz = akis.getVideoTracks()[0];
+			const s = iz.getSettings();
 			if (s.deviceId) ayar.kamera = s.deviceId;
 			kameraAcik = true;
 			bildir(
@@ -350,12 +374,15 @@
 		if (!tarayici.uygun) return;
 		isTuvali = document.createElement('canvas');
 		let ro: ResizeObserver | undefined;
+		// Cihaz takılıp çıkarıldığında (OBS sanal kamera açılınca vb.) liste kendiliğinden yenilenir
+		navigator.mediaDevices?.addEventListener('devicechange', kameralariListele);
 		tick().then(() => {
 			kameralariListele();
 			ro = new ResizeObserver(bolgeCiz);
 			ro.observe(bolgeTuval);
 		});
 		return () => {
+			navigator.mediaDevices?.removeEventListener('devicechange', kameralariListele);
 			ro?.disconnect();
 			calisiyor = false;
 			clearTimeout(zamanlayici);
@@ -382,8 +409,8 @@
 			'@type': 'FAQPage',
 			mainEntity: [
 				[
-					'GTA 6 Türkçe altyazı var mı?',
-					"Bu araç resmi bir çeviri değildir; oyundaki İngilizce altyazıları ekrandan okuyup Chrome'un yerleşik çevirmeniyle anında Türkçeye çevirir."
+					'Oyunun Türkçe altyazısı yoksa ne yapabilirim?',
+					"Bu araç oyundaki İngilizce altyazıları ekrandan okuyup Chrome'un yerleşik çevirmeniyle anında Türkçeye çevirir. Resmi bir çeviri değildir."
 				],
 				[
 					'Ne gerekiyor?',
@@ -418,7 +445,7 @@
 </svelte:head>
 
 <header>
-	<h1>🎮 GTA 6 Türkçe Altyazı Çevirisi</h1>
+	<h1>🎮 Altyazı Çeviri</h1>
 	{#if tarayici?.uygun}<span class="durum {durum.sinif}">{durum.mesaj}</span>{/if}
 	<span class="bosluk"></span>
 	<Sayac />
@@ -477,12 +504,21 @@
 
 		<aside class="panel">
 			<label for="kamera">Kamera / capture kart</label>
-			<select id="kamera" bind:value={ayar.kamera} onchange={() => akis && kameraBaslat()}>
-				<option value="">Varsayılan kamera</option>
-				{#each kameralar as k, i (k.deviceId || i)}
-					<option value={k.deviceId}>{k.label || 'Kamera ' + (i + 1)}</option>
-				{/each}
-			</select>
+			<div class="secim">
+				<select id="kamera" bind:value={ayar.kamera} onchange={() => akis && kameraBaslat()}>
+					<option value="">Varsayılan kamera</option>
+					{#each kameralar as k, i (k.deviceId || i)}
+						<option value={k.deviceId}>{k.label || 'Kamera ' + (i + 1)}</option>
+					{/each}
+				</select>
+				<button
+					class="ikincil yenile"
+					onclick={kameralariYenile}
+					disabled={yenileniyor}
+					title="Kamera listesini yenile (sonradan bağlanan OBS sanal kamera, capture kart)"
+					aria-label="Kamera listesini yenile">⟳</button
+				>
+			</div>
 			<div class="satir">
 				<button onclick={kameraBaslat}>
 					{kameraAcik ? 'Kamerayı yeniden başlat' : 'Kamerayı başlat'}
@@ -491,6 +527,7 @@
 					{calisiyor ? 'Durdur' : 'Çeviriyi başlat'}
 				</button>
 			</div>
+			<KameraAyarlari {iz} />
 
 			<label for="tip">Altyazı tipi</label>
 			<select id="tip" bind:value={ayar.tip} onchange={() => (sonImza = null)}>
@@ -583,10 +620,10 @@
 	</p>
 
 	<h2>Sık sorulan sorular</h2>
-	<h3>GTA 6 Türkçe altyazı var mı?</h3>
+	<h3>Oyunun Türkçe altyazısı yoksa ne yapabilirim?</h3>
 	<p>
-		Bu araç resmi bir çeviri değildir; oyundaki İngilizce altyazıları ekrandan okuyup Chrome'un
-		yerleşik çevirmeniyle anında Türkçeye çevirir.
+		Bu araç oyundaki İngilizce altyazıları ekrandan okuyup Chrome'un yerleşik çevirmeniyle anında
+		Türkçeye çevirir. Resmi bir çeviri değildir.
 	</p>
 	<h3>Ne gerekiyor?</h3>
 	<p>
@@ -598,11 +635,11 @@
 		Hayır, tamamen ücretsizdir. Görüntü ve metin hiçbir sunucuya gönderilmez; her şey tarayıcınızda
 		işlenir.
 	</p>
-	<p class="yasal">
-		Bu site Rockstar Games veya Take-Two Interactive ile bağlantılı değildir. "Grand Theft Auto" ve
-		"GTA" ilgili sahiplerinin ticari markalarıdır.
-	</p>
 </article>
+
+<footer class="surum" title="Derleme: {DERLEME}">
+	Sürüm {SURUM}{COMMIT ? ` · ${COMMIT}` : ''}
+</footer>
 
 <style>
 	header {
@@ -728,6 +765,19 @@
 	}
 	input[type='range'] {
 		width: 100%;
+	}
+	.secim {
+		display: flex;
+		gap: 6px;
+	}
+	.secim select {
+		flex: 1;
+		min-width: 0;
+	}
+	.yenile {
+		padding: 0 12px;
+		font-size: 16px;
+		line-height: 1;
 	}
 	.satir {
 		display: flex;
@@ -859,8 +909,11 @@
 	.bilgi b {
 		color: var(--text);
 	}
-	.yasal {
-		margin-top: 32px;
-		font-size: 12px;
+	.surum {
+		text-align: center;
+		color: var(--muted);
+		font-size: 11px;
+		padding: 0 16px 24px;
+		opacity: 0.7;
 	}
 </style>

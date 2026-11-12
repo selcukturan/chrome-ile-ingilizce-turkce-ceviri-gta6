@@ -6,6 +6,9 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 COPY . .
+# Coolify commit kodunu verir (sayfadaki sürüm bilgisinde görünür); verilmezse boş kalır
+ARG SOURCE_COMMIT=""
+ENV SOURCE_COMMIT=$SOURCE_COMMIT
 RUN npm run build && npm prune --omit=dev
 
 # --- 2. aşama: çalışma (sadece gerekli dosyalar)
