@@ -38,10 +38,11 @@ export function tekrarMi(yeni: string, eski: string): boolean {
 	if (!a || !b) return false;
 	// Yeni metin eskinin bir parçası (kısa cevaplar hariç: "No." gibi yeni bir altyazı olabilir)
 	if (a.length >= 12 && b.includes(a)) return true;
-	// Kelimelerin neredeyse tamamı eski metinde varsa (araya çöp karışmış okuma)
+	// Kelimelerin neredeyse tamamı eski metinde AYNI SIRAYLA geçiyorsa (araya çöp karışmış okuma).
+	// Sıra şartı önemli: "I don't want you." ile "Do what you want. I don't care." farklı altyazılardır.
 	const ak = a.split(' '),
-		bk = new Set(b.split(' '));
-	if (ak.length >= 4 && ak.filter((w) => bk.has(w)).length / ak.length >= 0.9) return true;
+		bk = b.split(' ');
+	if (ak.length >= 4 && ortakSira(ak, bk) / ak.length >= 0.9) return true;
 	return benzerlik(a, b) >= 0.85;
 }
 
@@ -70,4 +71,16 @@ export function benzerlik(a: string, b: string): number {
 		prev = cur;
 	}
 	return 1 - prev[n] / Math.max(m, n);
+}
+
+// En uzun ortak alt dizi (kelime sırası korunarak kaç kelime ortak)
+function ortakSira(a: string[], b: string[]): number {
+	let onceki = new Array(b.length + 1).fill(0);
+	for (let i = 1; i <= a.length; i++) {
+		const simdi = [0];
+		for (let j = 1; j <= b.length; j++)
+			simdi[j] = a[i - 1] === b[j - 1] ? onceki[j - 1] + 1 : Math.max(onceki[j], simdi[j - 1]);
+		onceki = simdi;
+	}
+	return onceki[b.length];
 }

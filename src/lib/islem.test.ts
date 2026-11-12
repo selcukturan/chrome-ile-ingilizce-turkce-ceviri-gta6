@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { argoUygula } from './argo.ts';
 import { hazirla } from './islem.ts';
+import { DEGISIM_ESIGI, DURGUNLUK_ESIGI, imzaFarki, type Imza } from './goruntu.ts';
 import { yazimDuzelt, yazimSozluguYukle } from './yazim.ts';
 import { metinTemizle, tekrarMi, uzantiMi } from './metin.ts';
 import { parcalara, SabitFiltre, type OcrKelime, type OcrSatir } from './ocr.ts';
@@ -333,5 +334,33 @@ describe('akış simülasyonu (sayfadaki karar mantığı)', () => {
 			]
 		]);
 		expect(sonuc).toEqual(['More interactive and detailed than ever']);
+	});
+});
+
+describe('arka arkaya gelen altyazılar', () => {
+	const imza = (desen: string): Imza => {
+		const bit = Uint8Array.from(desen, (c) => (c === '#' ? 1 : 0));
+		return { w: desen.length, h: 1, bit, yazi: bit.reduce((a, b) => a + b, 0) };
+	};
+
+	it('yazı pikselleri yer değiştirince değişiklik sayılır, küçük titreme sayılmaz', () => {
+		const a = imza('..##.###..##.#....');
+		const farkli = imza('.#..##..#.##..##..'); // aynı uzunlukta başka yazı
+		const titreme = imza('..##.###..##.##...'); // 1 piksel fark
+		expect(imzaFarki(a, farkli)).toBeGreaterThan(DEGISIM_ESIGI);
+		expect(imzaFarki(a, titreme)).toBeLessThanOrEqual(DURGUNLUK_ESIGI);
+		expect(imzaFarki(imza('..........'), imza('...##.....'))).toBeGreaterThan(DEGISIM_ESIGI); // boş → yazı
+		expect(imzaFarki(a, imza('###'))).toBeGreaterThan(DEGISIM_ESIGI); // bölge boyutu değişti
+	});
+
+	it('aynı kelimeleri farklı sırayla içeren altyazıyı tekrar saymaz', () => {
+		expect(tekrarMi("I don't want you.", "(Do what you want. I don't care.)")).toBe(false);
+		// araya çöp karışmış aynı altyazı yine tekrar
+		expect(
+			tekrarMi(
+				'rugged livestock towns to modernizing cities and much more.',
+				'gran rugged livestock towns GN to modernizing cities and much more. auth'
+			)
+		).toBe(true);
 	});
 });

@@ -9,6 +9,15 @@ Sürüm numarası `package.json` içindeki `version` alanıdır; sayfanın altı
 
 Numaralandırma: hata düzeltmesi → son hane (0.6.**1**), yeni özellik → orta hane (0.**7**.0).
 
+## 0.8.1 — 2026-11-13
+
+- **Düzeltme:** Arada boşluk olmadan arka arkaya gelen altyazılar algılanmıyordu (değişiklik
+  tespiti 24×6 ızgara ortalamasıydı, benzer uzunluktaki cümleleri ayırt edemiyordu). Artık yazı
+  pikselleri karşılaştırılıyor; bölge ve yazı boyutundan bağımsız.
+- Düşük güvenle reddedilen altyazı (ör. tam belirmeden okunmuş) 0,5 sn sonra bir kez daha okunur.
+- Titreyen görüntüde durulma beklemesi en fazla 3 kez yapılır, sonra yine de okunur.
+- Tekrar tespiti kelime sırasına bakar ("I don't want you." ≠ "Do what you want. I don't care.").
+
 ## 0.8.0 — 2026-11-13
 
 - "OCR'a giden görüntü" sol tarafa, altyazının altına taşındı; panel genişliğinde büyük gösterilir.

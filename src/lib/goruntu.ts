@@ -4,7 +4,7 @@ export type Bolge = { x: number; y: number; w: number; h: number }; // 0..1 norm
 export type AltyaziTipi = 'white' | 'yellow' | 'dark' | 'none';
 
 export type Kutu = { left: number; top: number; width: number; height: number };
-export type Kare = { murekkep: number; imza: number[]; kutu: Kutu };
+export type Kare = { murekkep: number; imza: Imza; kutu: Kutu };
 
 const KUTU_PAYI = 16; // yazı kutusunun kenarına bırakılan boşluk (kelime kesilmesin)
 
@@ -87,30 +87,39 @@ export function kareIsle(
 	return { murekkep: murekkep / (d.length / 4), imza: imzaCikar(is, img.data), kutu };
 }
 
-// Değişiklik tespiti için küçük imza (24x6 ızgara)
-function imzaCikar(is: HTMLCanvasElement, d: Uint8ClampedArray): number[] {
-	const gw = 24,
-		gh = 6,
-		cw = is.width / gw,
-		ch = is.height / gh,
-		out: number[] = [];
-	for (let gy = 0; gy < gh; gy++)
-		for (let gx = 0; gx < gw; gx++) {
-			let s = 0,
-				n = 0;
-			for (let y = Math.floor(gy * ch); y < (gy + 1) * ch; y += 3)
-				for (let x = Math.floor(gx * cw); x < (gx + 1) * cw; x += 3) {
-					s += d[(y * is.width + x) * 4];
-					n++;
-				}
-			out.push(n ? s / n : 255);
+// ---------- değişiklik tespiti ----------
+// İmza: görüntüden seyrek örneklenmiş "yazı pikseli mi?" haritası (~240 sütun).
+// Fark: değişen yazı pikseli / yazı pikseli sayısı. Bölge boyutundan ve yazı büyüklüğünden
+// bağımsızdır. Ölçüm (sentetik altyazılar): farklı altyazılar 1,26–1,40, boş → yazı 1,00;
+// aynı altyazı titreme/gürültüyle en fazla ~0,67.
+// (Eski 24x6 ızgara ortalaması, arka arkaya gelen farklı altyazıları ayırt edemiyordu: 0,1–1,9 < 4)
+export type Imza = { w: number; h: number; bit: Uint8Array; yazi: number };
+
+/** Bu değerin üstü: ekrandaki yazı değişti. */
+export const DEGISIM_ESIGI = 0.9;
+/** Bu değerin altı: görüntü durdu (altyazı tam belirdi). */
+export const DURGUNLUK_ESIGI = 0.5;
+
+function imzaCikar(is: HTMLCanvasElement, d: Uint8ClampedArray): Imza {
+	const adim = Math.max(2, Math.round(is.width / 240));
+	const w = Math.ceil(is.width / adim),
+		h = Math.ceil(is.height / adim);
+	const bit = new Uint8Array(w * h);
+	let yazi = 0;
+	for (let gy = 0; gy < h; gy++)
+		for (let gx = 0; gx < w; gx++) {
+			// beyaz zemin üstünde siyah yazı: R kanalı < 128 → yazı
+			if (d[(gy * adim * is.width + gx * adim) * 4] < 128) {
+				bit[gy * w + gx] = 1;
+				yazi++;
+			}
 		}
-	return out;
+	return { w, h, bit, yazi };
 }
 
-export function imzaFarki(a: number[] | null, b: number[] | null): number {
-	if (!a || !b) return 999;
-	let s = 0;
-	for (let i = 0; i < a.length; i++) s += Math.abs(a[i] - b[i]);
-	return s / a.length;
+export function imzaFarki(a: Imza | null, b: Imza | null): number {
+	if (!a || !b || a.w !== b.w || a.h !== b.h) return 99;
+	let farkli = 0;
+	for (let i = 0; i < a.bit.length; i++) if (a.bit[i] !== b.bit[i]) farkli++;
+	return farkli / Math.max(a.yazi, b.yazi, 1);
 }

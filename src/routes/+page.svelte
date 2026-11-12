@@ -6,7 +6,16 @@
 	import { COMMIT, DERLEME, SURUM } from '#lib/surum.ts';
 	import { MIN_CHROME_SURUMU, tarayiciKontrol, type TarayiciDurumu } from '#lib/tarayici.ts';
 	import { cevir, cevirmenHazirla } from '#lib/ceviri.ts';
-	import { imzaFarki, kareIsle, type AltyaziTipi, type Bolge, type Kutu } from '#lib/goruntu.ts';
+	import {
+		DEGISIM_ESIGI,
+		DURGUNLUK_ESIGI,
+		imzaFarki,
+		kareIsle,
+		type AltyaziTipi,
+		type Bolge,
+		type Imza,
+		type Kutu
+	} from '#lib/goruntu.ts';
 	import { tekrarMi, uzantiMi } from '#lib/metin.ts';
 	import { hazirla } from '#lib/islem.ts';
 	import { parcalara, SabitFiltre, type OcrSatir } from '#lib/ocr.ts';
@@ -232,8 +241,10 @@
 
 	// ---------- OCR + ana döngü ----------
 	let isci: Worker | null = null;
-	let sonImza: number[] | null = null,
-		bekleyenImza: number[] | null = null,
+	let sonImza: Imza | null = null,
+		bekleyenImza: Imza | null = null,
+		beklemeSayisi = 0, // aynı değişiklik için kaç kez durulma beklendi
+		yenidenOku = 0, // düşük güvenle reddedilen kareyi bir kez daha okuma zamanı (ms)
 		sonMetin = '',
 		bosBaslangic = 0,
 		zamanlayici: ReturnType<typeof setTimeout> | undefined;
@@ -243,6 +254,10 @@
 	const CIKTI = { text: false, blocks: true, hocr: false, tsv: false };
 	// Görüntü değişince tekrar bakma süresi: altyazı tam belirene (fade-in) kadar bekler
 	const DURULMA_MS = 80;
+	// Titreyen görüntüde sonsuza kadar beklenmesin: en fazla bu kadar bekleyip yine de okunur
+	const MAKS_BEKLEME = 3;
+	// Düşük güvenle reddedilen altyazı (ör. tam belirmeden okunmuş) bu kadar sonra bir kez daha okunur
+	const YENIDEN_OKUMA_MS = 500;
 
 	async function isciHazirla() {
 		if (isci) return isci;
@@ -285,18 +300,30 @@
 					}
 					sonImza = kare.imza;
 					bekleyenImza = null;
-				} else if (imzaFarki(kare.imza, sonImza) > 4) {
+					beklemeSayisi = 0;
+					yenidenOku = 0;
+				} else if (imzaFarki(kare.imza, sonImza) > DEGISIM_ESIGI) {
 					bosBaslangic = 0;
-					if (!bekleyenImza || imzaFarki(kare.imza, bekleyenImza) > 3) {
+					yenidenOku = 0;
+					const durdu = bekleyenImza && imzaFarki(kare.imza, bekleyenImza) <= DURGUNLUK_ESIGI;
+					if (!durdu && beklemeSayisi < MAKS_BEKLEME) {
 						// Görüntü hâlâ değişiyor (altyazı beliriyor/kayboluyor): biraz sonra tekrar bak
 						bekleyenImza = kare.imza;
+						beklemeSayisi++;
 						istat.bekleme++;
 						hizli = true;
 					} else {
 						bekleyenImza = null;
+						beklemeSayisi = 0;
 						sonImza = kare.imza;
-						await yaziOku(kare.kutu, t0);
+						if ((await yaziOku(kare.kutu, t0)) === 'dusuk')
+							yenidenOku = Date.now() + YENIDEN_OKUMA_MS;
 					}
+				} else if (yenidenOku && Date.now() >= yenidenOku) {
+					// Reddedilen altyazı hâlâ ekranda: tam belirmiş haliyle bir kez daha oku
+					yenidenOku = 0;
+					sonImza = kare.imza;
+					await yaziOku(kare.kutu, t0);
 				}
 			}
 		} catch (e) {
@@ -309,7 +336,7 @@
 		}
 	}
 
-	async function yaziOku(kutu: Kutu, t0: number) {
+	async function yaziOku(kutu: Kutu, t0: number): Promise<'dusuk' | 'tekrar' | 'yeni'> {
 		const { data } = await isci!.recognize(isTuvali!, { rectangle: kutu }, CIKTI);
 		const t1 = performance.now();
 		istat.ocr++;
@@ -324,11 +351,11 @@
 
 		if (harf < 2 || p.guven < ayar.minGuven) {
 			istat.dusuk++;
-			return;
+			return 'dusuk';
 		}
 		if (tekrarMi(ingilizce, sonMetin)) {
 			istat.tekrar++;
-			return;
+			return 'tekrar';
 		}
 		// Ekrandaki metin uzadıysa (satır satır beliren altyazı) yeni kayıt açılmaz, son kayıt güncellenir.
 		// Sabit yazı filtresi de sadece gerçekten yeni altyazılarla öğrenir (uzayan metnin ilk satırı
@@ -353,6 +380,7 @@
 			bildir('Çeviri hatası: ' + (e as Error).message, 'warn');
 			goster(ingilizce, '');
 		}
+		return 'yeni';
 	}
 
 	async function baslatDurdur() {
