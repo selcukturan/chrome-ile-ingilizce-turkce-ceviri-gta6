@@ -45,6 +45,15 @@ export function tekrarMi(yeni: string, eski: string): boolean {
 	return benzerlik(a, b) >= 0.85;
 }
 
+// Yeni metin eskinin uzamış hali mi? (satır satır beliren altyazı: eski metin yenide aynen duruyor)
+export function uzantiMi(yeni: string, eski: string): boolean {
+	const a = sadelestir(yeni).split(' '),
+		b = sadelestir(eski).split(' ');
+	if (b.length < 3 || a.length <= b.length) return false;
+	const ak = new Set(a);
+	return b.filter((w) => ak.has(w)).length / b.length >= 0.8;
+}
+
 // Levenshtein tabanlı benzerlik (0..1)
 export function benzerlik(a: string, b: string): number {
 	a = a.toLowerCase();

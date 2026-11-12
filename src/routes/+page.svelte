@@ -5,8 +5,8 @@
 	import { MIN_CHROME_SURUMU, tarayiciKontrol, type TarayiciDurumu } from '#lib/tarayici.ts';
 	import { cevir, cevirmenHazirla } from '#lib/ceviri.ts';
 	import { imzaFarki, kareIsle, type AltyaziTipi, type Bolge, type Kutu } from '#lib/goruntu.ts';
-	import { tekrarMi } from '#lib/metin.ts';
-	import { baglamla, hazirla, konusmaMi, type Asamalar } from '#lib/islem.ts';
+	import { tekrarMi, uzantiMi } from '#lib/metin.ts';
+	import { hazirla } from '#lib/islem.ts';
 	import { parcalara, SabitFiltre, type OcrSatir } from '#lib/ocr.ts';
 	import { yazimSozluguYukle } from '#lib/yazim.ts';
 	import { argoKuralSayisi } from '#lib/argo.ts';
@@ -156,10 +156,13 @@
 	}
 
 	// ---------- Gösterim ----------
-	function goster(ing: string, tur: string, giden = '') {
+	function goster(ing: string, tur: string, giden = '', guncelle = false) {
 		tr = tur;
 		en = ing;
-		if (tur) gecmis = [{ tr: tur, en: ing, giden }, ...gecmis].slice(0, 50);
+		if (!tur) return;
+		const kayit = { tr: tur, en: ing, giden };
+		gecmis =
+			guncelle && gecmis.length ? [kayit, ...gecmis.slice(1)] : [kayit, ...gecmis].slice(0, 50);
 	}
 
 	async function buyukAc() {
@@ -183,7 +186,6 @@
 	let isci: Worker | null = null;
 	let sonImza: number[] | null = null,
 		bekleyenImza: number[] | null = null,
-		sonAnlatim: (Asamalar & { zaman: number }) | null = null, // ekranlara bölünen cümleler için
 		sonMetin = '',
 		bosBaslangic = 0,
 		zamanlayici: ReturnType<typeof setTimeout> | undefined;
@@ -258,14 +260,14 @@
 		istat.ocr++;
 		istat.ocrMs += t1 - t0;
 
-		const p = parcalara(data.lines as unknown as OcrSatir[], sabit);
+		const p = parcalara(data.lines as unknown as OcrSatir[], sabit, isTuvali!.width);
 		const asamalar = p.parcalar
 			.map((x) => hazirla(x, ayar))
 			.filter((a) => /[A-Za-z].*[A-Za-z]/.test(a.duzeltilmis));
 		const ingilizce = asamalar.map((a) => a.duzeltilmis).join('\n');
 		const harf = (ingilizce.match(/[A-Za-z]/g) || []).length;
 
-		if (harf < 3 || p.guven < ayar.minGuven) {
+		if (harf < 2 || p.guven < ayar.minGuven) {
 			istat.dusuk++;
 			return;
 		}
@@ -273,26 +275,22 @@
 			istat.tekrar++;
 			return;
 		}
+		// Ekrandaki metin uzadıysa (satır satır beliren altyazı) yeni kayıt açılmaz, son kayıt güncellenir.
+		// Sabit yazı filtresi de sadece gerçekten yeni altyazılarla öğrenir (uzayan metnin ilk satırı
+		// her seferinde aynı yerde durduğu için logo sanılmasın).
+		const uzanti = uzantiMi(ingilizce, sonMetin);
 		sonMetin = ingilizce;
-		sabit.ogren(p.kelimeler);
-
-		// Önceki ekrandan devam eden anlatım cümlesi varsa birlikte çevrilir
-		const simdi = Date.now();
-		const gosterilecek = asamalar.map((a) => {
-			if (konusmaMi(a)) return a;
-			const b = baglamla(sonAnlatim, a, simdi);
-			sonAnlatim = { ...b, zaman: simdi };
-			return b;
-		});
+		if (!uzanti) sabit.ogren(p.kelimeler, p.kisaSatirlar);
 		try {
 			// Parçalar (anlatıcı + diyalog gibi) ayrı ayrı ve aynı anda çevrilir
-			const ceviriler = await Promise.all(gosterilecek.map((a) => cevir(a.cevrilecek)));
+			const ceviriler = await Promise.all(asamalar.map((a) => cevir(a.cevrilecek)));
 			istat.ceviri++;
 			if (ingilizce === sonMetin)
 				goster(
-					gosterilecek.map((a) => a.duzeltilmis).join('\n'),
+					ingilizce,
 					ceviriler.join('\n'),
-					gosterilecek.map((a) => a.cevrilecek).join('\n')
+					asamalar.map((a) => a.cevrilecek).join('\n'),
+					uzanti
 				);
 			sure = { ocr: Math.round(t1 - t0), ceviri: Math.round(performance.now() - t1) };
 			bildir(`Çalışıyor · OCR güveni %${Math.round(p.guven)}`, 'ok');
@@ -325,7 +323,6 @@
 			calisiyor = true;
 			sonImza = null;
 			bekleyenImza = null;
-			sonAnlatim = null;
 			sonMetin = '';
 			istat = bosIstatistik();
 			bildir('Çalışıyor…', 'ok');

@@ -9,12 +9,18 @@ export type OcrKelime = {
 	bbox: { x0: number; y0: number; x1: number; y1: number };
 };
 export type OcrSatir = { words: OcrKelime[] };
+type Kutu = OcrKelime['bbox'];
 
 export const KELIME_MIN_GUVEN = 40;
 
-/** Farklı altyazılarda aynı konumda tekrar eden kelimeleri öğrenir. */
+/**
+ * Farklı altyazılarda aynı konumda tekrar eden yazıları öğrenir:
+ *  - kelimeler: metin + konum ("author" filigranı),
+ *  - kısa kenar satırları: sadece konum (logo her seferinde farklı okunsa da: "Gi bfg", "her", "grand").
+ */
 export class SabitFiltre {
 	private kayit = new Map<string, { kez: number; son: number }>();
+	private bolgeler = new Map<string, { kez: number; son: number }>();
 	private tur = 0;
 
 	constructor(
@@ -43,9 +49,40 @@ export class SabitFiltre {
 		return !!b && b.v.kez >= this.esik;
 	}
 
-	/** Yeni bir altyazı kabul edildiğinde, içindeki tüm kelimelerle çağrılır. */
-	ogren(kelimeler: OcrKelime[]) {
+	private bolgeAnahtar(b: Kutu, dx = 0, dy = 0) {
+		const g = this.izgara * 2;
+		return `${Math.round((b.x0 + b.x1) / 2 / g) + dx},${Math.round((b.y0 + b.y1) / 2 / g) + dy}`;
+	}
+
+	private bolgeBul(b: Kutu) {
+		for (const dx of [0, -1, 1])
+			for (const dy of [0, -1, 1]) {
+				const a = this.bolgeAnahtar(b, dx, dy);
+				const v = this.bolgeler.get(a);
+				if (v) return { a, v };
+			}
+		return null;
+	}
+
+	sabitBolgeMi(b: Kutu): boolean {
+		const r = this.bolgeBul(b);
+		return !!r && r.v.kez >= this.esik;
+	}
+
+	/** Yeni bir altyazı kabul edildiğinde, içindeki tüm kelimeler ve kısa kenar satırlarıyla çağrılır. */
+	ogren(kelimeler: OcrKelime[], kisaSatirlar: Kutu[] = []) {
 		this.tur++;
+		for (const b of kisaSatirlar) {
+			const r = this.bolgeBul(b);
+			if (r) {
+				r.v.kez++;
+				r.v.son = this.tur;
+			} else this.bolgeler.set(this.bolgeAnahtar(b), { kez: 1, son: this.tur });
+		}
+		for (const [a, v] of this.bolgeler) {
+			if (v.son < this.tur && v.kez < this.esik) this.bolgeler.delete(a);
+			else if (this.tur - v.son > this.unutma) this.bolgeler.delete(a);
+		}
 		for (const k of kelimeler) {
 			if (!/[a-z0-9]/i.test(k.text)) continue;
 			const b = this.bul(k);
@@ -64,6 +101,7 @@ export class SabitFiltre {
 
 	sifirla() {
 		this.kayit.clear();
+		this.bolgeler.clear();
 		this.tur = 0;
 	}
 }
@@ -72,7 +110,11 @@ export type Parcalar = {
 	parcalar: string[]; // ayrı ayrı çevrilecek metin parçaları
 	guven: number; // kalan kelimelerin ortalama güveni
 	kelimeler: OcrKelime[]; // filtreden önceki tüm kelimeler (SabitFiltre.ogren için)
+	kisaSatirlar: Kutu[]; // kenardaki kısa satırların kutuları (SabitFiltre.ogren için)
 };
+
+const KISA_SATIR_HARF = 10; // bu kadar harf ve en fazla 3 kelimeden oluşan satır "kısa" sayılır
+const KENAR_ORANI = 0.2; // satır merkezi görüntü merkezinden genişliğin bu oranı kadar uzaksa kenardadır
 
 const CUMLE_SONU = /[.!?…)"]$/;
 const YENI_KONUSMA = /^[([\-–—"]/;
@@ -94,11 +136,25 @@ function gruplariSuz(kelimeler: OcrKelime[]): OcrKelime[] {
 	if (gruplar.length === 1) return kelimeler;
 	const harf = gruplar.map((g) => harfSayisi(g.map((k) => k.text).join('')));
 	const enBuyuk = Math.max(...harf);
-	return gruplar.filter((_, i) => harf[i] >= 8 || harf[i] >= enBuyuk * 0.5).flat();
+	// Altyazı satırı tek bir bloktur; ondan belirgin şekilde küçük gruplar çöptür
+	return gruplar.filter((_, i) => harf[i] >= enBuyuk * 0.5).flat();
 }
 
-export function parcalara(satirlar: OcrSatir[], filtre?: SabitFiltre): Parcalar {
+function birlesik(kelimeler: OcrKelime[]): Kutu {
+	return {
+		x0: Math.min(...kelimeler.map((k) => k.bbox.x0)),
+		y0: Math.min(...kelimeler.map((k) => k.bbox.y0)),
+		x1: Math.max(...kelimeler.map((k) => k.bbox.x1)),
+		y1: Math.max(...kelimeler.map((k) => k.bbox.y1))
+	};
+}
+
+/**
+ * @param genislik OCR'a verilen görüntünün genişliği; kenardaki kısa satırları (logo) ayırt etmek için.
+ */
+export function parcalara(satirlar: OcrSatir[], filtre?: SabitFiltre, genislik = 0): Parcalar {
 	const kelimeler: OcrKelime[] = [];
+	const kisaSatirlar: Kutu[] = [];
 	const temizSatirlar: string[] = [];
 	let toplam = 0,
 		sayi = 0;
@@ -111,6 +167,18 @@ export function parcalara(satirlar: OcrSatir[], filtre?: SabitFiltre): Parcalar 
 			kalan.push(k);
 		}
 		const suzulmus = gruplariSuz(kalan);
+
+		// Kenarda duran kısa satır: konumu öğrenilir, sabitse atılır
+		if (genislik && s.words.length) {
+			const kutu = birlesik(s.words);
+			const metin = suzulmus.map((k) => k.text).join('');
+			const kenarda = Math.abs((kutu.x0 + kutu.x1) / 2 - genislik / 2) > genislik * KENAR_ORANI;
+			if (kenarda && suzulmus.length <= 3 && harfSayisi(metin) <= KISA_SATIR_HARF) {
+				kisaSatirlar.push(kutu);
+				if (filtre?.sabitBolgeMi(kutu)) continue;
+			}
+		}
+
 		for (const k of suzulmus) {
 			toplam += k.confidence;
 			sayi++;
@@ -138,5 +206,5 @@ export function parcalara(satirlar: OcrSatir[], filtre?: SabitFiltre): Parcalar 
 		else parcalar.push(satir);
 	}
 
-	return { parcalar, guven: sayi ? toplam / sayi : 0, kelimeler };
+	return { parcalar, guven: sayi ? toplam / sayi : 0, kelimeler, kisaSatirlar };
 }

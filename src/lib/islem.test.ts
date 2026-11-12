@@ -1,9 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { argoUygula } from './argo.ts';
-import { baglamla, hazirla, type Asamalar } from './islem.ts';
+import { hazirla } from './islem.ts';
 import { yazimDuzelt, yazimSozluguYukle } from './yazim.ts';
-import { metinTemizle, tekrarMi } from './metin.ts';
+import { metinTemizle, tekrarMi, uzantiMi } from './metin.ts';
 import { parcalara, SabitFiltre, type OcrKelime, type OcrSatir } from './ocr.ts';
 
 beforeAll(async () => {
@@ -223,29 +223,112 @@ describe('RDR2 denemesinden gelen örnekler', () => {
 		expect(p.parcalar).toEqual(['Each time they flee']);
 	});
 
-	it('ekranlara bölünen anlatım cümlesini birleştirir, diyaloğu karıştırmaz', () => {
-		const o = { yazim: true, argo: true };
-		let onceki: (Asamalar & { zaman: number }) | null = null;
-		const sonuc: string[] = [];
-		for (const [metin, t] of [
-			['Call out to a passing rider,', 0],
-			['talk yourself into with a local tough guy', 3000],
-			['or out of trouble with a town sheriff', 6000]
-		] as const) {
-			const b = baglamla(onceki, hazirla(metin, o), t);
-			onceki = { ...b, zaman: t };
-			sonuc.push(b.duzeltilmis);
+	it('karışık büyük harfli OCR çıktısını düzeltir', () => {
+		expect(yazimDuzelt('(I aM HaPPY)')).toBe('(I am happy)');
+	});
+
+	it('satır satır uzayan metni uzantı sayar', () => {
+		const a =
+			"There is a huge world to explore set across a range of America's heartland and frontier";
+		const b = a + ' did from harsh mountain trails and dense forests';
+		expect(uzantiMi(b, a)).toBe(true);
+		expect(uzantiMi(a, b)).toBe(false); // kısalma uzantı değil (tekrarMi yakalar)
+		expect(tekrarMi(a, b)).toBe(true);
+		expect(uzantiMi('Hunting helps the camp or earns you money.', a)).toBe(false);
+	});
+});
+
+describe('akış simülasyonu (sayfadaki karar mantığı)', () => {
+	const G = 1500; // OCR görüntü genişliği
+	const k = (text: string, x: number, y: number): OcrKelime => ({
+		text,
+		confidence: 90,
+		bbox: { x0: x, y0: y, x1: x + text.length * 22, y1: y + 40 }
+	});
+	// Altyazıyı ortalanmış kelimelere çevirir
+	const ortala = (metin: string, y: number) => {
+		const w = metin.split(' ');
+		let x = G / 2 - (metin.length * 22) / 2;
+		return w.map((t) => {
+			const r = k(t, x, y);
+			x += t.length * 22 + 14;
+			return r;
+		});
+	};
+
+	// +page.svelte'deki yaziOku() kararlarının aynısı
+	function calistir(kareler: OcrSatir[][]) {
+		const filtre = new SabitFiltre();
+		let son = '';
+		const gecmis: string[] = [];
+		for (const satirlar of kareler) {
+			const p = parcalara(satirlar, filtre, G);
+			const en = p.parcalar
+				.map((x) => hazirla(x, { yazim: true, argo: false }).duzeltilmis)
+				.filter((x) => /[A-Za-z].*[A-Za-z]/.test(x))
+				.join('\n');
+			if ((en.match(/[A-Za-z]/g) || []).length < 2 || tekrarMi(en, son)) continue;
+			const uzanti = uzantiMi(en, son);
+			son = en;
+			if (!uzanti) filtre.ogren(p.kelimeler, p.kisaSatirlar);
+			if (uzanti && gecmis.length) gecmis[0] = en;
+			else gecmis.unshift(en);
 		}
-		expect(sonuc[2]).toBe(
-			'Call out to a passing rider, talk yourself into with a local tough guy or out of trouble with a town sheriff'
+		return gecmis.reverse();
+	}
+
+	it('her seferinde farklı okunan köşe logosunu konumundan öğrenir', () => {
+		const logo = ['Gi bfg', 'her', 'grand', 'GRaND', 'her', 'dUGIOR'];
+		const altyazi = [
+			'Hunting helps the camp.',
+			'Your saddle can store weapons.',
+			'Each weapon is unique.',
+			'Shooting has been improved.',
+			'This is a rich world.',
+			'And the modern world was born.'
+		];
+		const sonuc = calistir(
+			altyazi.map((a, i) => [
+				{ words: logo[i].split(' ').map((t, j) => k(t, 40 + j * 70 + (i % 2) * 4, 30)) },
+				{ words: ortala(a, 110) }
+			])
 		);
-		// diyalog ve büyük harfle başlayan yeni cümle birleşmez
-		const ilk = { ...hazirla('This is a world that is rich in depth', o), zaman: 0 };
-		expect(baglamla(ilk, hazirla('(Clear out)', o), 1000).duzeltilmis).toBe('(Clear out)');
-		expect(baglamla(ilk, hazirla('Hunting helps the camp.', o), 1000).duzeltilmis).toBe(
-			'Hunting helps the camp.'
+		// ilk 3 altyazıda logo görünebilir, sonrasında görünmemeli
+		expect(sonuc.slice(3)).toEqual(altyazi.slice(3));
+	});
+
+	it('satır satır uzayan anlatımı tek kayıtta günceller', () => {
+		const s1 = "There is a huge world to explore set across America's heartland";
+		const s2 = 'from harsh mountain trails and dense forests';
+		const s3 = 'to rugged livestock towns and much more.';
+		const sonuc = calistir([
+			[{ words: ortala(s1, 40) }],
+			[{ words: ortala(s1, 40) }, { words: ortala(s2, 90) }],
+			[{ words: ortala(s1, 40) }, { words: ortala(s2, 90) }, { words: ortala(s3, 140) }],
+			[{ words: ortala('Hunting helps the camp.', 40) }]
+		]);
+		expect(sonuc).toEqual([`${s1} ${s2} ${s3}`, 'Hunting helps the camp.']);
+	});
+
+	it('ortadaki art arda kısa diyalogları logo sanmaz', () => {
+		const sonuc = calistir(
+			['(Yes.)', '(No.)', '(What?)', '(Me?)', '(Go.)'].map((d) => [{ words: ortala(d, 110) }])
 		);
-		// çok geç gelen parça birleşmez
-		expect(baglamla(ilk, hazirla('and detail,', o), 20_000).duzeltilmis).toBe('and detail,');
+		expect(sonuc).toEqual(['(Yes.)', '(No.)', '(What?)', '(Me?)', '(Go.)']);
+	});
+
+	it('aynı satırdaki küçük çöp grubunu atar ("her grand")', () => {
+		const sonuc = calistir([
+			[
+				{
+					words: [
+						k('her', 20, 40),
+						k('grand', 90, 40),
+						...ortala('More interactive and detailed than ever', 40)
+					]
+				}
+			]
+		]);
+		expect(sonuc).toEqual(['More interactive and detailed than ever']);
 	});
 });

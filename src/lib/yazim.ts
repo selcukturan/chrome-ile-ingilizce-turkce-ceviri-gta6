@@ -275,8 +275,9 @@ function harfDuzeni(metin: string): string {
 	const korunanBuyuk = (w: string) =>
 		korunan.has(w.toLowerCase()) ? w[0].toUpperCase() + w.slice(1).toLowerCase() : w;
 
-	// TAMAMI BÜYÜK HARF
-	if (!/[a-z]/.test(harfler)) {
+	// TAMAMI (ya da OCR hatasıyla neredeyse tamamı) BÜYÜK HARF: "I aM HaPPY"
+	const buyukOrani = (harfler.match(/[A-Z]/g) || []).length / harfler.length;
+	if (buyukOrani >= 0.7) {
 		return cumleDuzeni(metin.toLowerCase()).replace(/[A-Za-z][A-Za-z']*/g, korunanBuyuk);
 	}
 	// Her Kelimenin Baş Harfi Büyük (en az 3 kelimenin %70'i)
