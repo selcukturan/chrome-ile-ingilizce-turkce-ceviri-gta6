@@ -1,0 +1,350 @@
+# ============================================================================
+#  ARGO SÖZLÜĞÜ  (GTA / ABD sokak dili → çeviri modelinin anlayacağı düz İngilizce)
+# ============================================================================
+#  Bu dosyadaki kurallar çeviriye gitmeden ÖNCE İngilizce metne uygulanır.
+#  Ekranda gösterilen İngilizce değişmez; sadece Türkçe çeviri etkilenir.
+#  Geliştirmede (npm run dev) kaydettiğiniz an geçerli olur; canlıda git push +
+#  Coolify yeniden dağıtımı gerekir (dosya uygulamanın içine gömülür).
+#
+#  İki tür kural var:
+#    ifade = yerine            → tam kelime/ifade eşleşir, büyük/küçük harf fark etmez
+#    re: kalıp => yerine       → düzenli ifade (regex), dosyadaki sırayla ve ÖNCE uygulanır
+#                                (grup referansı \1 veya $1 yazılabilir)
+#                                (yerine gelen metindeki boşluklar önemliyse "..." içine yazın)
+#
+#  Bir kural yanlış sonuç veriyorsa başına # koyup kapatın.
+#  Uzun ifadeler kısa olanlardan önce uygulanır ("my nigga", "nigga"dan önce).
+#
+#  NOT: Birden fazla anlamı olan kelimeler (ride, jack, score, piece, bands,
+#  crack, blow, ice, set, cop...) bilerek TEK BAŞINA eklenmedi; sadece anlamı
+#  kesin olan kalıplar içinde geçiyorlar ("my ride", "ten grand" gibi).
+# ============================================================================
+
+
+# ---------------------------------------------------------------------------
+#  1) YAZIM KISALTMALARI (kalıp kuralları, en önce uygulanır)
+# ---------------------------------------------------------------------------
+# g düşürme + bitişik yazım: fuckin'dead → fucking dead
+re: \b([A-Za-z]{2,})in'(?=[A-Za-z]) => "\1ing "
+# g düşürme: happenin' → happening, nothin' → nothing, fuckin' → fucking
+re: \b([A-Za-z]{2,})in'(?=\W|$) => \1ing
+# "-ass" sıfat eki, arkasından bir isim geliyorsa: "yee-yee ass haircut" → "yee-yee haircut"
+re: \b(stupid|dumb|punk|bitch|broke|lazy|crazy|cheap|weak|soft|scary|fake|sorry|yee-yee|bougie|nosy|silly|lame|tired|ugly|bad|big|little|old)[- ]ass (?!(?:all|and|the|for|out|off|over|down|back|here|there|now|again|too|in|on|up|to|is|was)\b)(?=[A-Za-z]{3,}) => "\1 "
+# para miktarları: "ten grand", "5 racks", "a couple bands" → "... thousand dollars"
+re: \b(\d+|one|two|three|four|five|six|seven|eight|nine|ten|twenty|thirty|fifty|hundred|couple|few|a couple|a few)\s+(?:grand|racks|bands|stacks|G's|Gs|K)\b => \1 thousand dollars
+# bitişik 'em: "took'em" → "took them"
+re: \b([A-Za-z]+)'em\b => "\1 them"
+# "dope" sıfat olarak (= harika): "that's dope", "so dope" → great
+re: \b(is|so|pretty|real|hella|that's|that is|was|looks|sounds|mad)\s+dope\b => \1 great
+# "yo'" (your anlamında): "yo' bitch" → "your bitch"
+re: \byo'(?=[a-z]) => "your "
+re: \byo'(?=\s|$) => your
+
+
+# ---------------------------------------------------------------------------
+#  2) KONUŞMA DİLİ KISALTMALARI
+# ---------------------------------------------------------------------------
+finna = going to
+fixing to = going to
+tryna = trying to
+gotta = have to
+gotsta = have to
+lemme = let me
+gimme = give me
+dunno = don't know
+kinda = kind of
+sorta = sort of
+outta = out of
+lotta = lot of
+'bout = about
+'cause = because
+'em = them
+'til = until
+y'all = you all
+ya'll = you all
+ain't got no = don't have any
+ain't got = don't have
+ain't nobody = nobody is
+ain't nothing = there is nothing
+ain't never = have never
+aight = alright
+a'ight = alright
+wassup = what's up
+whassup = what's up
+whaddup = what's up
+what up = what's up
+sup = what's up
+nah = no
+naw = no
+yup = yes
+yep = yes
+whatchu = what do you
+whatcha = what are you
+tha = the
+dat = that
+fo' real = for real
+fo sho = for sure
+fo' sho' = for sure
+for sho = for sure
+
+
+# ---------------------------------------------------------------------------
+#  3) HİTAP SÖZCÜKLERİ
+# ---------------------------------------------------------------------------
+my nigga = my brother
+my niggas = my brothers
+niggas = guys
+niggaz = guys
+nigga = man
+my boy = my friend
+my dude = my friend
+my G = my friend
+homeboy = buddy
+homegirl = girlfriend
+homeslice = buddy
+holmes = buddy
+dawg = buddy
+, dog = , buddy
+fam = buddy
+bruh = brother
+shawty = girl
+shorty = girl
+OG = veteran
+playa = player
+gangsta shit = gangster stuff
+gangsta = gangster
+
+
+# ---------------------------------------------------------------------------
+#  4) PARA
+# ---------------------------------------------------------------------------
+get this bread = make this money
+cheddar = money
+dough = money
+get that paper = make that money
+benjamins = hundred-dollar bills
+ballin' = rich
+balling = rich
+baller = rich guy
+broke as hell = completely broke
+hustling = making money
+hustler = street dealer
+on the come up = getting rich
+
+
+# ---------------------------------------------------------------------------
+#  5) POLİS / HAPİS
+# ---------------------------------------------------------------------------
+five-o = police
+five-oh = police
+po-po = police
+popo = police
+the pigs = the police
+pigs = cops
+the fuzz = the police
+the feds = the federal agents
+feds = federal agents
+narc = informant
+snitch = informant
+snitching = informing
+snitched = informed
+rat on = inform on
+got busted = got arrested
+get busted = get arrested
+busted = arrested
+got pinched = got arrested
+got locked up = went to prison
+did time = was in prison
+doing time = in prison
+wanted level = police search level
+
+
+# ---------------------------------------------------------------------------
+#  6) SİLAH / ŞİDDET / ÇETE
+# ---------------------------------------------------------------------------
+strapped = armed
+packing heat = carrying a gun
+my piece = my gun
+gat = gun
+my strap = my gun
+the strap = the gun
+pop a cap in = shoot
+pop him = shoot him
+pop her = shoot her
+popped him = shot him
+smoke him = kill him
+smoke them = kill them
+smoked him = killed him
+waste him = kill him
+wasted him = killed him
+ice him = kill him
+iced him = killed him
+whack him = kill him
+whacked him = killed him
+take him out = kill him
+took him out = killed him
+take them out = kill them
+take out the = neutralize the
+lit him up = shot him
+dome him = shoot him in the head
+drive-by = drive-by shooting
+catch these hands = fight me
+throw hands = fight
+beef with = a problem with
+got beef = have a problem
+squash it = forget it
+ride or die = loyal to the end
+gangbanging = gang life
+gangbanger = gang member
+gangbangers = gang members
+on the block = in the neighborhood
+the hood = the neighborhood
+turf = territory
+
+
+# ---------------------------------------------------------------------------
+#  7) ARABA / SOYGUN
+# ---------------------------------------------------------------------------
+my whip = my car
+this whip = this car
+that whip = that car
+nice whip = nice car
+my ride = my car
+nice ride = nice car
+these rides = these cars
+boosting = stealing cars
+boost some cars = steal some cars
+boost a car = steal a car
+carjack = steal a car
+this lick = this heist
+a lick = a heist
+the lick = the heist
+hit a lick = rob someone
+the take = the stolen money
+getaway car = escape car
+chop shop = illegal car workshop
+hot car = stolen car
+
+
+# ---------------------------------------------------------------------------
+#  8) UYUŞTURUCU
+# ---------------------------------------------------------------------------
+slinging dope = selling drugs
+slinging = selling drugs
+smoking dope = smoking weed
+dope = drugs
+kush = marijuana
+chronic = marijuana
+blunt = marijuana cigarette
+spliff = marijuana cigarette
+trap house = drug house
+the trap = the drug house
+the plug = the drug supplier
+high as hell = very high
+stoned = high
+
+
+# ---------------------------------------------------------------------------
+#  9) DEYİMLER VE KALIPLAR
+# ---------------------------------------------------------------------------
+what's the hold up = what's taking so long
+good looking out = thanks for the help
+appreciate it = thank you
+I'm straight = I'm fine
+we straight = we're fine
+you straight = are you okay
+straight up = honestly
+for real = seriously
+no cap = no lie
+on God = I swear
+on my mama = I swear
+on everything = I swear
+my bad = my mistake
+you tripping = you're overreacting
+stop tripping = calm down
+quit tripping = calm down
+tripping = overreacting
+chill out = calm down
+we cool = we're okay
+you cool = are you okay
+it's all good = it's fine
+word up = I agree
+true that = that's true
+say less = understood
+I feel you = I understand you
+you feel me = do you understand me
+real talk = seriously
+keep it real = be honest
+keeping it real = being honest
+keep it one hundred = be honest
+it's lit = it's great
+that's fire = that's great
+that's sick = that's great
+dope as hell = really great
+bougie = snobbish
+janky = shoddy
+sketchy = suspicious
+shady = suspicious
+flexing = showing off
+fronting = pretending
+stunting = showing off
+talking shit about = talking badly about
+talk shit about = talk badly about
+talking shit = talking nonsense
+talk shit = talk nonsense
+bullshitting = lying
+full of shit = lying
+my shit = my stuff
+your shit = your stuff
+some shit = something
+this shit = this
+that shit = that
+no shit = obviously
+holy shit = oh my god
+legit = legitimate
+for good = forever
+get your ass = get yourself
+bring your ass = come here
+move your ass = hurry up
+your ass could = you could
+I'm out = I'm leaving
+I'm outta here = I'm leaving
+let's bounce = let's go
+roll out = let's go
+let's roll = let's go
+hit me up = call me
+holla at me = call me
+hit you up = call you
+get at me = contact me
+got your back = protect you
+I got this = I can handle this
+moms = mom
+my pops = my dad
+my crib = my house
+the crib = the house
+hood rat = trashy person
+punk = coward
+sucker = loser
+chump = loser
+busta = coward
+hoes = whores
+hoe = whore
+I ran whores = I ran prostitutes
+
+
+# ---------------------------------------------------------------------------
+#  10) OYUN GÖREVLERİ (GTA hedef metinleri)
+# ---------------------------------------------------------------------------
+go to the guard = go to the security guard
+lose the cops = escape the police
+evade the cops = escape the police
+pick up point = pickup point
+take out the guards = neutralize the guards
+
+
+# ---------------------------------------------------------------------------
+#  11) CİNSELLİK / KABA İFADELER
+# ---------------------------------------------------------------------------
+jerking off = masturbating
+jerk off = masturbate
+jerked off = masturbated
