@@ -15,7 +15,7 @@ const TOPLAM_KELIME = 1024908267229; // SymSpell'deki korpus büyüklüğü (ola
 const KARISMALAR: [string, string][] = [
 	['rn', 'm'], ['r', 't'], ['n', 'h'], ['c', 't'], ['i', 'f'], ['l', 'i'],
 	['t', 'r'], ['h', 'n'], ['m', 'rn'], ['ii', 'u'], ['vv', 'w'], ['0', 'o'],
-	['1', 'l'], ['5', 's'], ['l', 't'], ['g', 'c'], ['rm', 'm']
+	['1', 'l'], ['5', 's'], ['l', 't'], ['t', 'l'], ['g', 'c'], ['rm', 'm']
 ]; // prettier-ignore
 
 // Kesme işareti düşmüş kısaltmalar
@@ -241,7 +241,10 @@ function kelimeDuzelt(w: string, cumleBasi: boolean): string {
 		let bolunmus: string | null = null,
 			bolMin = 0;
 		if (!kucuk.includes("'") && kucuk.length >= 5) {
-			const p = bol(kucuk);
+			// Araya yapışmış tek çöp harf atılır: "andfother" → "and" "f" "other" → "and other"
+			const p = bol(kucuk).filter(
+				(x, i, d) => x.length > 1 || x === 'a' || x === 'i' || d.length === 1
+			);
 			if (p.length > 1 && p.length <= 4) {
 				const enAz = Math.min(...p.map(f));
 				if (enAz >= 3_000_000) {
@@ -325,7 +328,11 @@ const BIR_I_KISALTMA = /(^|[\s("'\-])1'(m|ll|ve|d)\b/gi;
 export function yazimDuzelt(metin: string): string {
 	if (!frekans) return metin;
 	metin = metin.replace(/！/g, '!').replace(/？/g, '?').replace(/，/g, ',');
-	metin = harfDuzeni(metin).replace(BIR_I, '$1I').replace(BIR_I_KISALTMA, "$1I'$2");
+	metin = harfDuzeni(metin)
+		.replace(BIR_I, '$1I')
+		.replace(BIR_I_KISALTMA, "$1I'$2")
+		// İki küçük harf arasına karışmış nokta: "be.explored" → "be explored"
+		.replace(/(?<=[a-z]{2})\.(?=[a-z]{2})/g, ' ');
 	let out = '',
 		pos = 0,
 		cumleBasi = true;

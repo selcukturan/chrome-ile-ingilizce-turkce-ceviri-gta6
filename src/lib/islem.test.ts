@@ -21,7 +21,10 @@ describe('yazım düzeltme', () => {
 		['Larnar, get in the car', 'Lamar, get in the car'], // korunan isim
 		['Ill remember you', "I'll remember you"],
 		['Hey,hey.Stop', 'Hey, hey. Stop'],
-		['Weare going', 'We are going']
+		['Weare going', 'We are going'],
+		['Animal pelts andfother items', 'Animal pelts and other items'], // araya yapışmış çöp harf
+		['all designed to be.explored on foot', 'all designed to be explored on foot'],
+		['(You kitled my cousin)', '(You killed my cousin)'] // fast model hatası
 	])('%s', (girdi, beklenen) => {
 		expect(yazimDuzelt(girdi)).toBe(beklenen);
 	});

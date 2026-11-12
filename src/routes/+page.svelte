@@ -198,9 +198,15 @@
 
 	async function isciHazirla() {
 		if (isci) return isci;
-		bildir('OCR motoru yükleniyor (ilk seferde ~10 MB indirir)…');
+		bildir('OCR motoru yükleniyor (ilk seferde ~8 MB indirir)…');
 		const { createWorker } = await import('tesseract.js');
 		isci = await createWorker('eng', 1, {
+			// Kendi sunucumuzdaki "fast" model: varsayılan best_int modelinden ~%40 hızlı,
+			// altyazılarda doğruluk farkı ihmal edilebilir (static/ocr/eng.traineddata, Apache-2.0).
+			// cachePath farklı olmalı: tarayıcı önbelleğindeki eski model kullanılmasın.
+			langPath: location.origin + '/ocr', // worker blob adresinden çalıştığı için tam adres
+			gzip: false,
+			cachePath: 'tessdata-fast',
 			logger: (m) => {
 				if (m.status && m.progress < 1) bildir(`OCR: ${m.status} %${Math.round(m.progress * 100)}`);
 			}
