@@ -9,6 +9,16 @@ export type OcrKelime = {
 	bbox: { x0: number; y0: number; x1: number; y1: number };
 };
 export type OcrSatir = { words: OcrKelime[] };
+
+/**
+ * tesseract.js v6+ sadece blok hiyerarşisini döndürür (data.lines kaldırıldı):
+ * blocks → paragraphs → lines → words. Satırları sırasıyla düz bir listeye toplar.
+ */
+export function satirlariTopla(
+	bloklar: { paragraphs: { lines: OcrSatir[] }[] }[] | null | undefined
+): OcrSatir[] {
+	return (bloklar ?? []).flatMap((b) => b.paragraphs.flatMap((p) => p.lines));
+}
 type Kutu = OcrKelime['bbox'];
 
 export const KELIME_MIN_GUVEN = 40;

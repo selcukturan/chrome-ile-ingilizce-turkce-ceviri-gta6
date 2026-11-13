@@ -18,7 +18,7 @@
 	} from '#lib/goruntu.ts';
 	import { tekrarMi, uzantiMi } from '#lib/metin.ts';
 	import { hazirla } from '#lib/islem.ts';
-	import { parcalara, SabitFiltre, type OcrSatir } from '#lib/ocr.ts';
+	import { parcalara, SabitFiltre, satirlariTopla } from '#lib/ocr.ts';
 	import { yazimSozluguYukle } from '#lib/yazim.ts';
 	import { argoKuralSayisi } from '#lib/argo.ts';
 	import { oku, yaz } from '#lib/depo.ts';
@@ -342,7 +342,7 @@
 		istat.ocr++;
 		istat.ocrMs += t1 - t0;
 
-		const p = parcalara(data.lines as unknown as OcrSatir[], sabit, isTuvali!.width);
+		const p = parcalara(satirlariTopla(data.blocks), sabit, isTuvali!.width);
 		const asamalar = p.parcalar
 			.map((x) => hazirla(x, ayar))
 			.filter((a) => /[A-Za-z].*[A-Za-z]/.test(a.duzeltilmis));

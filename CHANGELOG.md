@@ -9,6 +9,13 @@ Sürüm numarası `package.json` içindeki `version` alanıdır; sayfanın altı
 
 Numaralandırma: hata düzeltmesi → son hane (0.6.**1**), yeni özellik → orta hane (0.**7**.0).
 
+## 0.9.0 — 2026-11-14
+
+- tesseract.js 5.1.1 → 7.0.0:
+  - Uzun kullanımda belleğin sürekli artıp çökmeye yol açtığı sızıntı giderildi (v6).
+  - OCR ~%29 hızlandı (ölçüm: 140 → 100 ms, aynı best_int modeli, doğruluk aynı) (v7).
+- v6+ `data.lines` döndürmediği için satırlar blok hiyerarşisinden toplanıyor (`satirlariTopla`).
+
 ## 0.8.1 — 2026-11-13
 
 - **Düzeltme:** Arada boşluk olmadan arka arkaya gelen altyazılar algılanmıyordu (değişiklik
