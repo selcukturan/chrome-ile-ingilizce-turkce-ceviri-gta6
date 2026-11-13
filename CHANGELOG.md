@@ -9,6 +9,14 @@ Sürüm numarası `package.json` içindeki `version` alanıdır; sayfanın altı
 
 Numaralandırma: hata düzeltmesi → son hane (0.6.**1**), yeni özellik → orta hane (0.**7**.0).
 
+## 0.10.1 — 2026-11-14
+
+- **Ön kontrol (performans):** Bölge 256 px'e küçültülüp en son tam işlenen kareyle
+  karşılaştırılır. Görüntü değişmediyse (oyun durdurulmuş, menü, sabit sahne) yazı ayıklama
+  atlanır. Yine de en az saniyede bir tam işlenir. İstatistikte "değişmedi" sayısı görünür.
+- **Boş bölge:** OCR bölgede yazı bulamıyorsa (2 harften az) ve bu 1,2 sn sürerse ekrandaki
+  çeviri silinir. Önceden sadece yazı pikseli kalmadığında siliniyordu.
+
 ## 0.10.0 — 2026-11-14
 
 - **Beyaz yazı ayıklama yenilendi** ("hale kuralı"): parlak kum, gökyüzü, su gibi arka plan artık

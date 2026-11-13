@@ -134,3 +134,70 @@ export function imzaFarki(a: Imza | null, b: Imza | null): number {
 	for (let i = 0; i < a.bit.length; i++) if (a.bit[i] !== b.bit[i]) farkli++;
 	return farkli / Math.max(a.yazi, b.yazi, 1);
 }
+
+// ---------- ön kontrol: görüntü hiç değişmediyse ayıklamayı atla ----------
+// Bölge griye çevrilip 256 px genişliğe küçültülür ve en son TAM İŞLENEN kareyle karşılaştırılır
+// (önceki kareyle değil: yavaş beliren altyazıda küçük farklar birikip eşiği aşar).
+// Parlaklık farkı ON_FARK'tan büyük piksellerin oranı ON_ORAN'ı geçerse "değişti" sayılır.
+// Kamera gürültüsü ON_FARK'ın altında kalır. Oyun durdurulmuşken, menüde ya da sabit sahnede
+// pahalı ayıklama (10–30 ms) hiç çalışmaz.
+const ON_GENISLIK = 256;
+const ON_FARK = 30;
+const ON_ORAN = 0.002;
+/** Görüntü değişmese de en az bu sıklıkta tam işlenir (güvenlik payı). */
+const ON_EN_UZUN_MS = 1000;
+
+export class OnKontrol {
+	private tuval: HTMLCanvasElement | null = null;
+	private ref: Uint8Array | null = null;
+	private anahtar = '';
+	private zaman = 0;
+
+	/** Ayıklama yapılmalı mı? true dönerse kare referans olarak saklanır. */
+	degisti(video: HTMLVideoElement, bolge: Bolge, anahtar: string): boolean {
+		const vw = video.videoWidth,
+			vh = video.videoHeight;
+		if (!vw) return true;
+		this.tuval ??= document.createElement('canvas');
+		const sw = bolge.w * vw,
+			sh = bolge.h * vh;
+		const w = ON_GENISLIK,
+			h = Math.max(1, Math.round((sh / sw) * w));
+		if (this.tuval.width !== w || this.tuval.height !== h) {
+			this.tuval.width = w;
+			this.tuval.height = h;
+		}
+		const ctx = this.tuval.getContext('2d', { willReadFrequently: true })!;
+		ctx.drawImage(video, bolge.x * vw, bolge.y * vh, sw, sh, 0, 0, w, h);
+		const d = ctx.getImageData(0, 0, w, h).data;
+		const gri = new Uint8Array(w * h);
+		for (let p = 0, i = 0; p < gri.length; p++, i += 4)
+			gri[p] = (d[i] * 77 + d[i + 1] * 150 + d[i + 2] * 29) >> 8;
+
+		const simdi = performance.now();
+		let degisti =
+			!this.ref ||
+			this.ref.length !== gri.length ||
+			anahtar !== this.anahtar ||
+			simdi - this.zaman > ON_EN_UZUN_MS;
+		if (!degisti) {
+			const sinir = gri.length * ON_ORAN;
+			let farkli = 0;
+			for (let p = 0; p < gri.length; p++)
+				if (Math.abs(gri[p] - this.ref![p]) > ON_FARK && ++farkli > sinir) {
+					degisti = true;
+					break;
+				}
+		}
+		if (degisti) {
+			this.ref = gri;
+			this.anahtar = anahtar;
+			this.zaman = simdi;
+		}
+		return degisti;
+	}
+
+	sifirla() {
+		this.ref = null;
+	}
+}

@@ -11,9 +11,11 @@
 		DURGUNLUK_ESIGI,
 		imzaFarki,
 		kareIsle,
+		OnKontrol,
 		type AltyaziTipi,
 		type Bolge,
 		type Imza,
+		type Kare,
 		type Kutu
 	} from '#lib/goruntu.ts';
 	import { tekrarMi, uzantiMi } from '#lib/metin.ts';
@@ -55,6 +57,7 @@
 	// Tarama istatistikleri: optimizasyonların etkisini görmek için
 	const bosIstatistik = () => ({
 		tur: 0,
+		atlama: 0, // görüntü değişmediği için ayıklaması atlanan tarama
 		bekleme: 0,
 		ocr: 0,
 		tekrar: 0,
@@ -247,8 +250,23 @@
 		yenidenOku = 0, // düşük güvenle reddedilen kareyi bir kez daha okuma zamanı (ms)
 		sonMetin = '',
 		bosBaslangic = 0,
+		bosOkundu = false, // son OCR bölgede yazı bulamadı (2 harften az)
+		sonKare: Kare | null = null,
 		zamanlayici: ReturnType<typeof setTimeout> | undefined;
 	const sabit = new SabitFiltre();
+	const onKontrol = new OnKontrol();
+	// Bölge bu kadar süre boş kalırsa (yazı pikseli yok ya da OCR yazı bulamıyor) çeviri silinir
+	const BOS_MS = 1200;
+
+	function bosSay() {
+		if (!sonMetin) return;
+		if (!bosBaslangic) bosBaslangic = Date.now();
+		else if (Date.now() - bosBaslangic > BOS_MS) {
+			sonMetin = '';
+			goster('', '');
+			bosBaslangic = 0;
+		}
+	}
 
 	// Sadece kullandığımız çıktılar (hOCR/TSV üretimi kapatılır)
 	const CIKTI = { text: false, blocks: true, hocr: false, tsv: false };
@@ -286,24 +304,30 @@
 		const t0 = performance.now();
 		let hizli = false;
 		try {
-			const kare = kareIsle(video, bolge, ayar.esik, ayar.tip, isTuvali, onizlemeHedef());
-			if (kare) kutuCiz(kare.kutu);
+			// Ön kontrol: görüntü son tam işlenen kareden beri değişmediyse ayıklama atlanır,
+			// önceki sonuç kullanılır (aşağıdaki zamanlayıcılar yine işler)
+			const anahtar = `${ayar.esik}|${ayar.tip}|${bolge.x},${bolge.y},${bolge.w},${bolge.h}|${ayar.onizleme}`;
+			let kare: Kare | null;
+			if (!onKontrol.degisti(video, bolge, anahtar) && sonKare) {
+				kare = sonKare;
+				istat.atlama++;
+			} else {
+				kare = sonKare = kareIsle(video, bolge, ayar.esik, ayar.tip, isTuvali, onizlemeHedef());
+				if (kare) kutuCiz(kare.kutu);
+			}
 			if (kare) {
 				istat.tur++;
 				if (kare.murekkep < 0.003) {
 					// Bölge boş: altyazı kaybolmuş
-					if (sonMetin && !bosBaslangic) bosBaslangic = Date.now();
-					if (bosBaslangic && Date.now() - bosBaslangic > 1200) {
-						sonMetin = '';
-						goster('', '');
-						bosBaslangic = 0;
-					}
+					bosSay();
+					bosOkundu = false;
 					sonImza = kare.imza;
 					bekleyenImza = null;
 					beklemeSayisi = 0;
 					yenidenOku = 0;
 				} else if (imzaFarki(kare.imza, sonImza) > DEGISIM_ESIGI) {
 					bosBaslangic = 0;
+					bosOkundu = false;
 					yenidenOku = 0;
 					const durdu = bekleyenImza && imzaFarki(kare.imza, bekleyenImza) <= DURGUNLUK_ESIGI;
 					if (!durdu && beklemeSayisi < MAKS_BEKLEME) {
@@ -316,14 +340,18 @@
 						bekleyenImza = null;
 						beklemeSayisi = 0;
 						sonImza = kare.imza;
-						if ((await yaziOku(kare.kutu, t0)) === 'dusuk')
-							yenidenOku = Date.now() + YENIDEN_OKUMA_MS;
+						const sonuc = await yaziOku(kare.kutu, t0);
+						if (sonuc === 'dusuk' || sonuc === 'bos') yenidenOku = Date.now() + YENIDEN_OKUMA_MS;
+						bosOkundu = sonuc === 'bos';
 					}
 				} else if (yenidenOku && Date.now() >= yenidenOku) {
 					// Reddedilen altyazı hâlâ ekranda: tam belirmiş haliyle bir kez daha oku
 					yenidenOku = 0;
 					sonImza = kare.imza;
-					await yaziOku(kare.kutu, t0);
+					bosOkundu = (await yaziOku(kare.kutu, t0)) === 'bos';
+				} else if (bosOkundu) {
+					// Yazı pikseli var ama OCR yazı bulamıyor (ör. altyazı gitti, arka planda leke kaldı)
+					bosSay();
 				}
 			}
 		} catch (e) {
@@ -336,7 +364,7 @@
 		}
 	}
 
-	async function yaziOku(kutu: Kutu, t0: number): Promise<'dusuk' | 'tekrar' | 'yeni'> {
+	async function yaziOku(kutu: Kutu, t0: number): Promise<'bos' | 'dusuk' | 'tekrar' | 'yeni'> {
 		const { data } = await isci!.recognize(isTuvali!, { rectangle: kutu }, CIKTI);
 		const t1 = performance.now();
 		istat.ocr++;
@@ -351,7 +379,7 @@
 
 		if (harf < 2 || p.guven < ayar.minGuven) {
 			istat.dusuk++;
-			return 'dusuk';
+			return harf < 2 ? 'bos' : 'dusuk';
 		}
 		if (tekrarMi(ingilizce, sonMetin)) {
 			istat.tekrar++;
@@ -407,6 +435,10 @@
 			sonImza = null;
 			bekleyenImza = null;
 			sonMetin = '';
+			bosBaslangic = 0;
+			bosOkundu = false;
+			sonKare = null;
+			onKontrol.sifirla();
 			istat = bosIstatistik();
 			bildir('Çalışıyor…', 'ok');
 			tarama();
@@ -572,9 +604,9 @@
 					class="ipucu sure"
 					title="Tarama: kare kontrolü · Bekleme: görüntü durulana kadar · OCR: yazı okuma · Tekrar/düşük: okunan ama çevrilmeyen"
 				>
-					{istat.tur} tarama · {istat.bekleme} bekleme · {istat.ocr} OCR (ort. {istat.ocr
-						? Math.round(istat.ocrMs / istat.ocr)
-						: 0} ms) · {istat.tekrar} tekrar · {istat.dusuk} düşük güven · {istat.ceviri} çeviri
+					{istat.tur} tarama ({istat.atlama} değişmedi) · {istat.bekleme} bekleme · {istat.ocr} OCR (ort.
+					{istat.ocr ? Math.round(istat.ocrMs / istat.ocr) : 0} ms) · {istat.tekrar} tekrar · {istat.dusuk}
+					düşük güven · {istat.ceviri} çeviri
 				</p>
 			{/if}
 		</section>
