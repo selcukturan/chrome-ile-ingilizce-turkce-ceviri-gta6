@@ -1,7 +1,9 @@
 // Kamera karesinden altyazı bölgesini kesip OCR için "beyaz zemin üstünde siyah yazı"ya çevirir.
 
 export type Bolge = { x: number; y: number; w: number; h: number }; // 0..1 normalize
-export type AltyaziTipi = 'white' | 'yellow' | 'dark' | 'none';
+import { konturluYazi } from './ayikla.ts';
+
+export type AltyaziTipi = 'white' | 'white-basit' | 'yellow' | 'dark' | 'none';
 
 export type Kutu = { left: number; top: number; width: number; height: number };
 export type Kare = { murekkep: number; imza: Imza; kutu: Kutu };
@@ -48,25 +50,34 @@ export function kareIsle(
 		if (y < minY) minY = y;
 		if (y > maxY) maxY = y;
 	};
-	for (let i = 0; i < d.length; i += 4) {
-		const r = d[i],
-			g = d[i + 1],
-			b = d[i + 2];
-		const lum = 0.299 * r + 0.587 * g + 0.114 * b;
-		if (tip === 'none') {
-			const v = 255 - lum;
+	if (tip === 'white') {
+		// Konturlu beyaz yazı: arka plandaki parlak alanlar ayıklanır (ayikla.ts)
+		const maske = konturluYazi(d, W, is.height, esik);
+		for (let p = 0, i = 0; p < maske.length; p++, i += 4) {
+			const v = maske[p] ? 0 : 255;
 			d[i] = d[i + 1] = d[i + 2] = v;
-			if (v < 128) isaretle(i);
-			continue;
+			if (maske[p]) isaretle(i);
 		}
-		let yazi: boolean;
-		if (tip === 'white') yazi = lum > esik && Math.max(r, g, b) - Math.min(r, g, b) < 60;
-		else if (tip === 'yellow') yazi = r > esik && g > esik - 30 && b < r - 50;
-		else yazi = lum < 255 - esik;
-		const v = yazi ? 0 : 255;
-		d[i] = d[i + 1] = d[i + 2] = v;
-		if (yazi) isaretle(i);
-	}
+	} else
+		for (let i = 0; i < d.length; i += 4) {
+			const r = d[i],
+				g = d[i + 1],
+				b = d[i + 2];
+			const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+			if (tip === 'none') {
+				const v = 255 - lum;
+				d[i] = d[i + 1] = d[i + 2] = v;
+				if (v < 128) isaretle(i);
+				continue;
+			}
+			let yazi: boolean;
+			if (tip === 'white-basit') yazi = lum > esik && Math.max(r, g, b) - Math.min(r, g, b) < 60;
+			else if (tip === 'yellow') yazi = r > esik && g > esik - 30 && b < r - 50;
+			else yazi = lum < 255 - esik;
+			const v = yazi ? 0 : 255;
+			d[i] = d[i + 1] = d[i + 2] = v;
+			if (yazi) isaretle(i);
+		}
 	ctx.putImageData(img, 0, 0);
 
 	if (onizleme) {

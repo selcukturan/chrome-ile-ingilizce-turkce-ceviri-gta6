@@ -609,6 +609,7 @@
 			<label for="tip">Altyazı tipi</label>
 			<select id="tip" bind:value={ayar.tip} onchange={() => (sonImza = null)}>
 				<option value="white">Beyaz yazı (PS5 varsayılanı)</option>
+				<option value="white-basit">Beyaz yazı, basit (konturu olmayan yazı için)</option>
 				<option value="yellow">Sarı yazı</option>
 				<option value="dark">Koyu yazı, açık zemin</option>
 				<option value="none">İşlem yok (sadece gri)</option>

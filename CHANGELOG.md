@@ -9,6 +9,16 @@ Sürüm numarası `package.json` içindeki `version` alanıdır; sayfanın altı
 
 Numaralandırma: hata düzeltmesi → son hane (0.6.**1**), yeni özellik → orta hane (0.**7**.0).
 
+## 0.10.0 — 2026-11-14
+
+- **Beyaz yazı ayıklama yenilendi** ("hale kuralı"): parlak kum, gökyüzü, su gibi arka plan artık
+  yazı sayılmıyor. Parlak her leke ayrı incelenir; kenarı koyu konturla çevrili olanlar yazıdır.
+  Harf boyuna uymayan lekeler, dolu bloklar ve satır dışındaki kırıntılar atılır.
+  - "ATT", "lao)", "ATN" gibi uydurma satırlar ve "time:on" gibi araya giren işaretler kalktı.
+  - Kırmızı çerçeve (OCR'a giden alan) sadece yazıyı kapsar.
+  - Ölçüm (gerçek oyun kareleri): kelime hatası %32,5 → %0. Koyu kutulu altyazılar da çalışır.
+- Eski davranış "Beyaz yazı, basit" seçeneği olarak duruyor (konturu olmayan yazılar için).
+
 ## 0.9.0 — 2026-11-14
 
 - tesseract.js 5.1.1 → 7.0.0:
