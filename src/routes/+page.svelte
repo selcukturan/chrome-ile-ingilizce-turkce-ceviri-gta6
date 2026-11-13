@@ -736,8 +736,8 @@
 			ya da DroidCam / Camo gibi uygulamalarla). Capture kart da kullanılabilir.
 		</li>
 		<li>
-			<b>Kamera ayarları</b>'nda parlaklığı yükseltip pozlamayı düşürün (testimizde parlaklık 100,
-			pozlama 80): ekran neredeyse kararır, altyazılar net biçimde öne çıkar.
+			<b>Kamera ayarları</b>'nda parlaklığı yükseltip pozlamayı düşürün (testimizde parlaklık 200,
+			pozlama 120): ekran neredeyse kararır, altyazılar net biçimde öne çıkar. Yine de kendi en iyi alt yazı görünümünüz için ayarları deneyin.
 		</li>
 		<li>Oyunda altyazıları açın (Ayarlar → Ses ve Altyazılar).</li>
 		<li>
