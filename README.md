@@ -1,6 +1,7 @@
 # chrome-ile-ingilizce-turkce-ceviri-gta6
 
-PS5 görüntüsünü bilgisayara bağlı kamera / capture kart üzerinden okuyup (Tesseract OCR),
+PS5 görüntüsünü TV'ye bakan bir kamera (web kamerası ya da web kamerası olarak bağlanan telefon;
+capture kart da olur) üzerinden okuyup (Tesseract OCR),
 altyazıları **Chrome'un yerleşik çevirmeniyle** İngilizceden Türkçeye çeviren tek sayfalık SvelteKit uygulaması.
 
 > Yalnızca **masaüstü Google Chrome 138+** için tasarlandı. Diğer tarayıcılarda ve mobil cihazlarda

@@ -518,7 +518,7 @@
 				],
 				[
 					'Ne gerekiyor?',
-					'Bilgisayar, masaüstü Google Chrome 138+ ve PS5 görüntüsünü bilgisayara aktaran bir capture kart ya da ekrana bakan bir kamera.'
+					'Bilgisayar, masaüstü Google Chrome 138+ ve TV ekranına bakan bir kamera: web kamerası ya da web kamerası olarak bağlanan bir telefon yeterli. Capture kart da kullanılabilir.'
 				],
 				[
 					'Ücretli mi?',
@@ -569,7 +569,7 @@
 			<h2>🖥️ Sadece bilgisayarda Google Chrome</h2>
 			<p class="neden">{tarayici.neden}</p>
 			<p>
-				Bu araç PS5 görüntüsünü bilgisayara bağlı kamera / capture kart üzerinden okur ve
+				Bu araç PS5 görüntüsünü bilgisayara bağlı bir kamera (telefon da olur) üzerinden okur ve
 				<b>Chrome'un yerleşik çevirmenini</b> kullanır. Bu yüzden yalnızca masaüstü Google Chrome
 				(sürüm
 				{MIN_CHROME_SURUMU}+) ile çalışır.
@@ -642,7 +642,7 @@
 		</section>
 
 		<aside class="panel">
-			<label for="kamera">Kamera / capture kart</label>
+			<label for="kamera">Kamera</label>
 			<div class="secim">
 				<select id="kamera" bind:value={ayar.kamera} onchange={() => akis && kameraBaslat()}>
 					<option value="">Varsayılan kamera</option>
@@ -731,8 +731,13 @@
 	<h2>Nasıl çalışır?</h2>
 	<ol>
 		<li>
-			PS5 görüntüsünü bilgisayara aktarın: <b>capture kart</b> (en iyi sonuç) veya ekrana bakan bir
-			<b>web kamerası</b>.
+			TV ekranına bakan bir <b>kamera</b> bağlayın: web kamerası ya da web kamerası olarak
+			kullanılan bir <b>telefon</b> (Android 14+ USB ile doğrudan, iPhone Mac'te Süreklilik Kamerası ile,
+			ya da DroidCam / Camo gibi uygulamalarla). Capture kart da kullanılabilir.
+		</li>
+		<li>
+			<b>Kamera ayarları</b>'nda parlaklığı yükseltip pozlamayı düşürün (testimizde parlaklık 100,
+			pozlama 80): ekran neredeyse kararır, altyazılar net biçimde öne çıkar.
 		</li>
 		<li>Oyunda altyazıları açın (Ayarlar → Ses ve Altyazılar).</li>
 		<li>
@@ -760,8 +765,10 @@
 	</p>
 	<h3>Ne gerekiyor?</h3>
 	<p>
-		Bilgisayar, masaüstü Google Chrome {MIN_CHROME_SURUMU}+ ve PS5 görüntüsünü bilgisayara aktaran
-		bir capture kart ya da ekrana bakan bir kamera. Telefon ve tabletlerde çalışmaz.
+		Bilgisayar, masaüstü Google Chrome {MIN_CHROME_SURUMU}+ ve TV ekranına bakan bir kamera: web
+		kamerası ya da web kamerası olarak bağlanan bir telefon yeterli. Capture kart da kullanılabilir.
+		Sayfanın kendisi telefon ve tablet tarayıcılarında çalışmaz; telefon yalnızca kamera olarak
+		kullanılır.
 	</p>
 	<h3>Ücretli mi?</h3>
 	<p>

@@ -2,6 +2,7 @@
 	// Kameranın donanım ayarları (parlaklık, kontrast, pozlama...).
 	// Sadece cihazın desteklediği ayarlar gösterilir. Web kameraları genelde birkaç ayar sunar;
 	// capture kartlar ve OBS sanal kamera çoğunlukla hiç ayar sunmaz.
+	// Ekrana bakan kamerada en iyi sonuç: parlaklık yüksek, pozlama düşük (altyazı dışı kararır).
 	// Ayarlar her cihaz için ayrı saklanır ve kamera açılınca tekrar uygulanır.
 	import { oku, yaz } from '#lib/depo.ts';
 
@@ -100,6 +101,10 @@
 	<details class="kamera-ayar">
 		<summary>Kamera ayarları</summary>
 		{#if ayarVar}
+			<p class="ipucu">
+				İpucu: Parlaklığı yükseltip pozlamayı düşürün (testimizde parlaklık 100, pozlama 80). Ekran
+				neredeyse kararır ama beyaz altyazılar net biçimde öne çıkar ve çok daha iyi okunur.
+			</p>
 			{#each modAyarlari as [ad, etiket] (ad)}
 				<label for={'mod-' + ad}>{etiket}</label>
 				<select

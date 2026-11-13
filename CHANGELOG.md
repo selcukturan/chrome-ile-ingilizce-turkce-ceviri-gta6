@@ -9,6 +9,15 @@ Sürüm numarası `package.json` içindeki `version` alanıdır; sayfanın altı
 
 Numaralandırma: hata düzeltmesi → son hane (0.6.**1**), yeni özellik → orta hane (0.**7**.0).
 
+## 0.11.2 — 2026-11-13
+
+- **Kamera öne çıktı:** Sayfa metinleri, SSS, açıklama ve paylaşım görseli (og.png) artık
+  capture kart yerine TV'ye bakan kamerayı (web kamerası ya da web kamerası olarak bağlanan
+  telefon) öneriyor. Capture kart hâlâ destekleniyor.
+- Kamera ayarlarına ipucu: parlaklık yüksek, pozlama düşük (ör. 100 / 80) → ekran kararır,
+  altyazılar net çıkar.
+- Paylaşım görseli artık `scripts/og.py` ile üretiliyor.
+
 ## 0.11.1 — 2026-11-13
 
 - **Düzeltme:** Kelimenin içine karışmış rakamlar düzeltilir: "1s" → "is", "w1th" → "with",
