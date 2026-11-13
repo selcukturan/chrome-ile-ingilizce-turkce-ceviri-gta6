@@ -171,6 +171,31 @@ function harfUydur(yeni: string, eski: string): string {
 
 const buyukMu = (s: string) => /[A-Z]/.test(s) && s === s.toUpperCase();
 
+// ---------- harfe karışmış rakam ----------
+// OCR kelime içindeki i/l harfini "1", o harfini "0" okuyabilir: "1s" → "is", "w1th" → "with",
+// "0n" → "on". Sayılara dokunulmaz: sadece 1 ve 0 dönüştürülür, harfler rakamlardan az olamaz
+// ("10s", "1800s" kalır), saat/sıra kalıpları ("1am", "2nd", "10k") kalır ve sonuç bilinen bir
+// kelime olmalıdır.
+const RAKAM_KALIP = /^\d+(?:am|pm|st|nd|rd|th|s|k|m|x|d|h)$/i;
+
+function rakamHarf(w: string): string {
+	const rakam = (w.match(/\d/g) || []).length,
+		harf = (w.match(/[A-Za-z]/g) || []).length;
+	if (/[2-9]/.test(w) || !harf || harf < rakam || rakam > 2) return w;
+	if (RAKAM_KALIP.test(w) && w !== '1s') return w;
+	let adaylar = [''];
+	for (const c of w.toLowerCase()) {
+		const secenek = c === '1' ? ['i', 'l'] : c === '0' ? ['o'] : [c];
+		adaylar = adaylar.flatMap((a) => secenek.map((s) => a + s));
+	}
+	let enIyi: string | null = null;
+	for (const a of adaylar) if (bilinen(a) && (!enIyi || puan(a) > puan(enIyi))) enIyi = a;
+	if (!enIyi) return w;
+	// harf düzeni: "1T" → "IT", "0n" → "On"
+	if (/^[A-Z0-9]+$/.test(w) && harf > 1) return enIyi.toUpperCase();
+	return /^[A-Z]/.test(w) ? enIyi[0].toUpperCase() + enIyi.slice(1) : enIyi;
+}
+
 // ---------- tek kelime ----------
 function kelimeDuzelt(w: string, cumleBasi: boolean): string {
 	if (w === 'Ill') return "I'll"; // "Ill remember you" → "I'll"
@@ -179,7 +204,11 @@ function kelimeDuzelt(w: string, cumleBasi: boolean): string {
 		const k = KISALTMALAR[kucuk];
 		return k.startsWith("I'") ? k : harfUydur(k, w);
 	}
-	if (bilinen(w) || /\d/.test(w) || w.length <= 1) return w;
+	if (/\d/.test(w)) {
+		const r = rakamHarf(w);
+		return cumleBasi && r !== w ? r[0].toUpperCase() + r.slice(1) : r;
+	}
+	if (bilinen(w) || w.length <= 1) return w;
 	if (buyukMu(w) && w.length > 2) return w; // HUD/tabela yazısı: dokunma
 	if (kucuk in BITISIK) return harfUydur(BITISIK[kucuk], w);
 

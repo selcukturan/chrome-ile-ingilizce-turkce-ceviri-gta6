@@ -9,6 +9,12 @@ Sürüm numarası `package.json` içindeki `version` alanıdır; sayfanın altı
 
 Numaralandırma: hata düzeltmesi → son hane (0.6.**1**), yeni özellik → orta hane (0.**7**.0).
 
+## 0.11.1 — 2026-11-13
+
+- **Düzeltme:** Kelimenin içine karışmış rakamlar düzeltilir: "1s" → "is", "w1th" → "with",
+  "0n" → "on", cümle başında "1t" → "It". Sayılara ve "1am", "2nd", "10s", "1800s" gibi
+  kalıplara dokunulmaz.
+
 ## 0.11.0 — 2026-11-13
 
 - **OCR ~5 kat hızlı:** Ayıklama büyütülmüş görüntüde yapılmaya devam ediyor, ama OCR'a giden

@@ -189,6 +189,19 @@ describe('RDR2 denemesinden gelen örnekler', () => {
 	});
 
 	it.each([
+		['this place 1s just too far for us.', 'this place is just too far for us.'],
+		['Stay w1th me.', 'Stay with me.'],
+		['Put it 0n the table.', 'Put it on the table.'],
+		['1t was a lie.', 'It was a lie.'], // cümle başı büyük harf
+		// sayılara ve saat/sıra kalıplarına dokunulmaz
+		['In the 1800s at 10 o clock', 'In the 1800s at 10 o clock'],
+		['Meet me at 1am, 2nd floor, room 101.', 'Meet me at 1am, 2nd floor, room 101.'],
+		['The 10s and 50s were wild.', 'The 10s and 50s were wild.']
+	])('harfe karışmış rakam: %s', (girdi, beklenen) => {
+		expect(yazimDuzelt(girdi)).toBe(beklenen);
+	});
+
+	it.each([
 		["(Well ain't this a rare treat?)", "(Well isn't this a rare treat?)"],
 		['(Hold still girl)', "(Don't move girl)"],
 		["I ain't got no money", "I don't have any money"]
