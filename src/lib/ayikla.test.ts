@@ -28,7 +28,7 @@ describe('konturluYazi', () => {
 		const d = resim();
 		for (let i = 0; i < 6; i++) harf(d, 150 + i * 18);
 		boya(d, 10, 10, 80, 50, 235); // parlak gökyüzü/kum parçası (kontursuz)
-		const m = konturluYazi(d, W, H, 190);
+		const m = konturluYazi(d, W, H, 190).maske;
 		for (let i = 0; i < 6; i++) expect(yazi(m, 154 + i * 18, 35)).toBe(true);
 		expect(yazi(m, 50, 35)).toBe(false);
 	});
@@ -40,7 +40,7 @@ describe('konturluYazi', () => {
 		boya(d, 20, 20, 100, 30, 250);
 		boya(d, 357, 2, 10, 8, 20); // satırın üstünde küçük konturlu leke
 		boya(d, 359, 4, 6, 4, 250);
-		const m = konturluYazi(d, W, H, 190);
+		const m = konturluYazi(d, W, H, 190).maske;
 		expect(yazi(m, 154, 35)).toBe(true);
 		expect(yazi(m, 60, 35)).toBe(false);
 		expect(yazi(m, 361, 5)).toBe(false);
@@ -50,7 +50,7 @@ describe('konturluYazi', () => {
 		const d = resim(200); // parlak zemin
 		boya(d, 130, 10, 140, 60, 40); // yarı saydam koyu altyazı kutusu
 		for (let i = 0; i < 6; i++) boya(d, 150 + i * 18, 20, 8, 30, 245);
-		const m = konturluYazi(d, W, H, 190);
+		const m = konturluYazi(d, W, H, 190).maske;
 		for (let i = 0; i < 6; i++) expect(yazi(m, 154 + i * 18, 35)).toBe(true);
 		expect(yazi(m, 20, 35)).toBe(false);
 	});
@@ -58,6 +58,17 @@ describe('konturluYazi', () => {
 	it('yazı yoksa boş maske döner', () => {
 		const d = resim();
 		boya(d, 10, 10, 300, 60, 235);
-		expect(konturluYazi(d, W, H, 190).some((v) => v)).toBe(false);
+		expect(konturluYazi(d, W, H, 190).maske.some((v) => v)).toBe(false);
+	});
+});
+
+describe('konturluYazi harf boyu', () => {
+	it('harf boyunu ölçer (OCR küçültmesi buna göre yapılır)', () => {
+		const d = resim();
+		for (let i = 0; i < 6; i++) harf(d, 150 + i * 18);
+		expect(konturluYazi(d, W, H, 190).boy).toBe(30);
+	});
+	it('yazı yoksa harf boyu 0', () => {
+		expect(konturluYazi(resim(), W, H, 190).boy).toBe(0);
 	});
 });

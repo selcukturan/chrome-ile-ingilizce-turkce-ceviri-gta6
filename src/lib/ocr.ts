@@ -15,9 +15,23 @@ export type OcrSatir = { words: OcrKelime[] };
  * blocks → paragraphs → lines → words. Satırları sırasıyla düz bir listeye toplar.
  */
 export function satirlariTopla(
-	bloklar: { paragraphs: { lines: OcrSatir[] }[] }[] | null | undefined
+	bloklar: { paragraphs: { lines: OcrSatir[] }[] }[] | null | undefined,
+	olcek = 1 // OCR'a küçültülmüş görüntü verildiyse: konumlar işleme tuvalinin ölçeğine geri çevrilir
 ): OcrSatir[] {
-	return (bloklar ?? []).flatMap((b) => b.paragraphs.flatMap((p) => p.lines));
+	const satirlar = (bloklar ?? []).flatMap((b) => b.paragraphs.flatMap((p) => p.lines));
+	if (olcek === 1) return satirlar;
+	return satirlar.map((s) => ({
+		...s,
+		words: s.words.map((k) => ({
+			...k,
+			bbox: {
+				x0: k.bbox.x0 / olcek,
+				y0: k.bbox.y0 / olcek,
+				x1: k.bbox.x1 / olcek,
+				y1: k.bbox.y1 / olcek
+			}
+		}))
+	}));
 }
 type Kutu = OcrKelime['bbox'];
 

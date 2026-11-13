@@ -12,6 +12,7 @@
 		imzaFarki,
 		kareIsle,
 		OnKontrol,
+		ocrGoruntusu,
 		type AltyaziTipi,
 		type Bolge,
 		type Imza,
@@ -63,8 +64,14 @@
 		tekrar: 0,
 		dusuk: 0,
 		ceviri: 0,
-		ocrMs: 0
+		ocrMs: 0,
+		// Değişiklik algılandığı andan çevirinin ekrana geldiği ana kadar geçen süreler (son 100)
+		gecikmeler: [] as number[]
 	});
+	function yuzdelik(dizi: number[], oran: number) {
+		const s = [...dizi].sort((a, b) => a - b);
+		return Math.round(s[Math.min(s.length - 1, Math.floor(s.length * oran))]);
+	}
 	let istat = $state(bosIstatistik());
 	type Kayit = { tr: string; en: string; giden: string };
 	let gecmis = $state<Kayit[]>([]);
@@ -252,6 +259,8 @@
 		bosBaslangic = 0,
 		bosOkundu = false, // son OCR bölgede yazı bulamadı (2 harften az)
 		sonKare: Kare | null = null,
+		degisimZamani = 0, // ekrandaki yazının değiştiği ilk algılanan an (gecikme ölçümü için)
+		ocrTuvali: HTMLCanvasElement | null = null,
 		zamanlayici: ReturnType<typeof setTimeout> | undefined;
 	const sabit = new SabitFiltre();
 	const onKontrol = new OnKontrol();
@@ -329,6 +338,7 @@
 					bosBaslangic = 0;
 					bosOkundu = false;
 					yenidenOku = 0;
+					if (!bekleyenImza) degisimZamani = t0;
 					const durdu = bekleyenImza && imzaFarki(kare.imza, bekleyenImza) <= DURGUNLUK_ESIGI;
 					if (!durdu && beklemeSayisi < MAKS_BEKLEME) {
 						// Görüntü hâlâ değişiyor (altyazı beliriyor/kayboluyor): biraz sonra tekrar bak
@@ -340,7 +350,7 @@
 						bekleyenImza = null;
 						beklemeSayisi = 0;
 						sonImza = kare.imza;
-						const sonuc = await yaziOku(kare.kutu, t0);
+						const sonuc = await yaziOku(kare, t0);
 						if (sonuc === 'dusuk' || sonuc === 'bos') yenidenOku = Date.now() + YENIDEN_OKUMA_MS;
 						bosOkundu = sonuc === 'bos';
 					}
@@ -348,7 +358,7 @@
 					// Reddedilen altyazı hâlâ ekranda: tam belirmiş haliyle bir kez daha oku
 					yenidenOku = 0;
 					sonImza = kare.imza;
-					bosOkundu = (await yaziOku(kare.kutu, t0)) === 'bos';
+					bosOkundu = (await yaziOku(kare, t0)) === 'bos';
 				} else if (bosOkundu) {
 					// Yazı pikseli var ama OCR yazı bulamıyor (ör. altyazı gitti, arka planda leke kaldı)
 					bosSay();
@@ -364,13 +374,16 @@
 		}
 	}
 
-	async function yaziOku(kutu: Kutu, t0: number): Promise<'bos' | 'dusuk' | 'tekrar' | 'yeni'> {
-		const { data } = await isci!.recognize(isTuvali!, { rectangle: kutu }, CIKTI);
+	async function yaziOku(kare: Kare, t0: number): Promise<'bos' | 'dusuk' | 'tekrar' | 'yeni'> {
+		// Temizlenmiş görüntü harf boyu ~34 px olacak şekilde küçültülüp OCR'a verilir (~5 kat hızlı)
+		ocrTuvali ??= document.createElement('canvas');
+		const g = ocrGoruntusu(isTuvali!, kare, ocrTuvali);
+		const { data } = await isci!.recognize(g.tuval, { rectangle: g.kutu }, CIKTI);
 		const t1 = performance.now();
 		istat.ocr++;
 		istat.ocrMs += t1 - t0;
 
-		const p = parcalara(satirlariTopla(data.blocks), sabit, isTuvali!.width);
+		const p = parcalara(satirlariTopla(data.blocks, g.olcek), sabit, isTuvali!.width);
 		const asamalar = p.parcalar
 			.map((x) => hazirla(x, ayar))
 			.filter((a) => /[A-Za-z].*[A-Za-z]/.test(a.duzeltilmis));
@@ -383,6 +396,7 @@
 		}
 		if (tekrarMi(ingilizce, sonMetin)) {
 			istat.tekrar++;
+			degisimZamani = 0;
 			return 'tekrar';
 		}
 		// Ekrandaki metin uzadıysa (satır satır beliren altyazı) yeni kayıt açılmaz, son kayıt güncellenir.
@@ -402,6 +416,10 @@
 					asamalar.map((a) => a.cevrilecek).join('\n'),
 					uzanti
 				);
+			if (degisimZamani) {
+				istat.gecikmeler = [...istat.gecikmeler.slice(-99), performance.now() - degisimZamani];
+				degisimZamani = 0;
+			}
 			sure = { ocr: Math.round(t1 - t0), ceviri: Math.round(performance.now() - t1) };
 			bildir(`Çalışıyor · OCR güveni %${Math.round(p.guven)}`, 'ok');
 		} catch (e) {
@@ -438,6 +456,7 @@
 			bosBaslangic = 0;
 			bosOkundu = false;
 			sonKare = null;
+			degisimZamani = 0;
 			onKontrol.sifirla();
 			istat = bosIstatistik();
 			bildir('Çalışıyor…', 'ok');
@@ -608,6 +627,17 @@
 					{istat.ocr ? Math.round(istat.ocrMs / istat.ocr) : 0} ms) · {istat.tekrar} tekrar · {istat.dusuk}
 					düşük güven · {istat.ceviri} çeviri
 				</p>
+				{#if istat.gecikmeler.length}
+					<p
+						class="ipucu sure"
+						title="Ekrandaki yazının değiştiği algılandıktan çevirinin ekrana gelmesine kadar geçen süre (son 100 altyazı)"
+					>
+						Gecikme: ortanca {yuzdelik(istat.gecikmeler, 0.5)} ms · en kötü {yuzdelik(
+							istat.gecikmeler,
+							1
+						)} ms
+					</p>
+				{/if}
 			{/if}
 		</section>
 

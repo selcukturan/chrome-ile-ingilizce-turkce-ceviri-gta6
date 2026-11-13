@@ -82,10 +82,15 @@ function genislet(
 }
 
 /**
- * RGBA görüntüde konturlu beyaz yazının maskesini döndürür (1 = yazı).
- * Dönen dizi bir sonraki çağrıda yeniden kullanılır; saklanacaksa kopyalanmalı.
+ * RGBA görüntüde konturlu beyaz yazının maskesini (1 = yazı) ve harf boyunu (px; yazı yoksa 0)
+ * döndürür. Maske bir sonraki çağrıda yeniden kullanılır; saklanacaksa kopyalanmalı.
  */
-export function konturluYazi(d: Uint8ClampedArray, W: number, H: number, esik: number): Uint8Array {
+export function konturluYazi(
+	d: Uint8ClampedArray,
+	W: number,
+	H: number,
+	esik: number
+): { maske: Uint8Array; boy: number } {
 	const N = W * H;
 	const t = tamponlar(N);
 	const { parlak, koyu, yakin, etiket, yigin } = t;
@@ -146,17 +151,17 @@ export function konturluYazi(d: Uint8ClampedArray, W: number, H: number, esik: n
 		lekeler.push(l);
 	}
 
-	lekeleriSuz(lekeler);
+	const boy = lekeleriSuz(lekeler);
 
 	// Sonuç maskesi "parlak" tamponuna yazılır
 	for (let p = 0; p < N; p++) parlak[p] = etiket[p] >= 0 && lekeler[etiket[p]].tut ? 1 : 0;
-	return parlak.subarray(0, N);
+	return { maske: parlak.subarray(0, N), boy };
 }
 
-// Harf boyuna uymayan ve yazı satırının dışında kalan lekeleri atar
-function lekeleriSuz(b: Leke[]) {
+// Harf boyuna uymayan ve yazı satırının dışında kalan lekeleri atar; harf boyunu döndürür
+function lekeleriSuz(b: Leke[]): number {
 	const aday = b.filter((c) => c.tut);
-	if (!aday.length) return;
+	if (!aday.length) return 0;
 	// Harf boyu: alan ağırlıklı boy ortancası (yüzlerce kırıntı, az sayıdaki harften az alan tutar)
 	const sirali = [...aday].sort((x, y) => x.y1 - x.y0 - (y.y1 - y.y0));
 	const toplam = aday.reduce((s, c) => s + c.alan, 0);
@@ -193,4 +198,5 @@ function lekeleriSuz(b: Leke[]) {
 				t !== c && t.y0 <= c.y1 && c.y0 <= t.y1 && Math.max(t.x0 - c.x1, c.x0 - t.x1) < boy * 1.2
 		);
 	}
+	return boy;
 }

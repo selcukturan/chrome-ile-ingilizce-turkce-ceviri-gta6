@@ -9,7 +9,15 @@ Sürüm numarası `package.json` içindeki `version` alanıdır; sayfanın altı
 
 Numaralandırma: hata düzeltmesi → son hane (0.6.**1**), yeni özellik → orta hane (0.**7**.0).
 
-## 0.10.1 — 2026-11-14
+## 0.11.0 — 2026-11-13
+
+- **OCR ~5 kat hızlı:** Ayıklama büyütülmüş görüntüde yapılmaya devam ediyor, ama OCR'a giden
+  temiz görüntü harf boyu ~34 px olacak şekilde küçültülüyor (asla büyütülmez). Ölçüm (gerçek
+  oyun kareleri): OCR 1264 → 237 ms, kelime hatası aynı (%0). Şimdilik "Beyaz yazı" tipinde.
+- İstatistiğe gecikme satırı: yazının değiştiği algılandıktan çevirinin ekrana gelmesine kadar
+  geçen sürenin ortancası ve en kötüsü (son 100 altyazı).
+
+## 0.10.1 — 2026-11-13
 
 - **Ön kontrol (performans):** Bölge 256 px'e küçültülüp en son tam işlenen kareyle
   karşılaştırılır. Görüntü değişmediyse (oyun durdurulmuş, menü, sabit sahne) yazı ayıklama
@@ -17,7 +25,7 @@ Numaralandırma: hata düzeltmesi → son hane (0.6.**1**), yeni özellik → or
 - **Boş bölge:** OCR bölgede yazı bulamıyorsa (2 harften az) ve bu 1,2 sn sürerse ekrandaki
   çeviri silinir. Önceden sadece yazı pikseli kalmadığında siliniyordu.
 
-## 0.10.0 — 2026-11-14
+## 0.10.0 — 2026-11-13
 
 - **Beyaz yazı ayıklama yenilendi** ("hale kuralı"): parlak kum, gökyüzü, su gibi arka plan artık
   yazı sayılmıyor. Parlak her leke ayrı incelenir; kenarı koyu konturla çevrili olanlar yazıdır.
@@ -27,7 +35,7 @@ Numaralandırma: hata düzeltmesi → son hane (0.6.**1**), yeni özellik → or
   - Ölçüm (gerçek oyun kareleri): kelime hatası %32,5 → %0. Koyu kutulu altyazılar da çalışır.
 - Eski davranış "Beyaz yazı, basit" seçeneği olarak duruyor (konturu olmayan yazılar için).
 
-## 0.9.0 — 2026-11-14
+## 0.9.0 — 2026-11-13
 
 - tesseract.js 5.1.1 → 7.0.0:
   - Uzun kullanımda belleğin sürekli artıp çökmeye yol açtığı sızıntı giderildi (v6).

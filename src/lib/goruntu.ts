@@ -6,7 +6,8 @@ import { konturluYazi } from './ayikla.ts';
 export type AltyaziTipi = 'white' | 'white-basit' | 'yellow' | 'dark' | 'none';
 
 export type Kutu = { left: number; top: number; width: number; height: number };
-export type Kare = { murekkep: number; imza: Imza; kutu: Kutu };
+/** boy: ayıklamanın ölçtüğü harf boyu (px, işleme tuvalinde); bilinmiyorsa 0 */
+export type Kare = { murekkep: number; imza: Imza; kutu: Kutu; boy: number };
 
 const KUTU_PAYI = 16; // yazı kutusunun kenarına bırakılan boşluk (kelime kesilmesin)
 
@@ -50,9 +51,12 @@ export function kareIsle(
 		if (y < minY) minY = y;
 		if (y > maxY) maxY = y;
 	};
+	let boy = 0;
 	if (tip === 'white') {
 		// Konturlu beyaz yazı: arka plandaki parlak alanlar ayıklanır (ayikla.ts)
-		const maske = konturluYazi(d, W, is.height, esik);
+		const sonuc = konturluYazi(d, W, is.height, esik);
+		const maske = sonuc.maske;
+		boy = sonuc.boy;
 		for (let p = 0, i = 0; p < maske.length; p++, i += 4) {
 			const v = maske[p] ? 0 : 255;
 			d[i] = d[i + 1] = d[i + 2] = v;
@@ -95,7 +99,48 @@ export function kareIsle(
 					width: Math.min(W, maxX + KUTU_PAYI + 1) - Math.max(0, minX - KUTU_PAYI),
 					height: Math.min(is.height, maxY + KUTU_PAYI + 1) - Math.max(0, minY - KUTU_PAYI)
 				};
-	return { murekkep: murekkep / (d.length / 4), imza: imzaCikar(is, img.data), kutu };
+	return { murekkep: murekkep / (d.length / 4), imza: imzaCikar(is, img.data), kutu, boy };
+}
+
+// ---------- OCR'a giden görüntünün boyutu ----------
+// Ayıklama büyütülmüş görüntüde daha iyi çalışır (ince kontur seçilir), ama Tesseract'ın bu kadar
+// büyük yazıya ihtiyacı yoktur ve süre görüntü boyutuyla hızla artar. Temizlenmiş görüntü, harf
+// boyu ~OCR_HARF_BOYU px olacak şekilde yumuşatılarak küçültülüp OCR'a verilir (asla büyütülmez).
+// Ölçüm (gerçek oyun kareleri): harf boyu 75 → 34 px, OCR ~5 kat hızlı, kelime hatası aynı (%0).
+// 26 px'te hatalar başlıyor.
+export const OCR_HARF_BOYU = 34;
+
+/** OCR'a verilecek tuval, dikdörtgen ve küçültme oranı (kelime konumları 1/olcek ile geri çevrilir). */
+export function ocrGoruntusu(
+	is: HTMLCanvasElement,
+	kare: Kare,
+	hedef: HTMLCanvasElement
+): { tuval: HTMLCanvasElement; kutu: Kutu; olcek: number } {
+	const olcek = kare.boy ? Math.min(1, OCR_HARF_BOYU / kare.boy) : 1;
+	if (olcek > 0.9) return { tuval: is, kutu: kare.kutu, olcek: 1 };
+	const w = Math.max(1, Math.round(is.width * olcek)),
+		h = Math.max(1, Math.round(is.height * olcek));
+	if (hedef.width !== w || hedef.height !== h) {
+		hedef.width = w;
+		hedef.height = h;
+	}
+	const ctx = hedef.getContext('2d')!;
+	ctx.imageSmoothingEnabled = true;
+	ctx.imageSmoothingQuality = 'high';
+	ctx.drawImage(is, 0, 0, w, h);
+	const k = kare.kutu,
+		left = Math.floor(k.left * olcek),
+		top = Math.floor(k.top * olcek);
+	return {
+		tuval: hedef,
+		olcek,
+		kutu: {
+			left,
+			top,
+			width: Math.min(w - left, Math.ceil(k.width * olcek)),
+			height: Math.min(h - top, Math.ceil(k.height * olcek))
+		}
+	};
 }
 
 // ---------- değişiklik tespiti ----------
