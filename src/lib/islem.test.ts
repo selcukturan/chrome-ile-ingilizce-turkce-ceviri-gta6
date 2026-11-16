@@ -20,6 +20,8 @@ describe('yazım düzeltme', () => {
 		['Lets get the hell out of hete', 'Lets get the hell out of here'], // t → r
 		['Irobbed the bank', 'I robbed the bank'],
 		['Larnar, get in the car', 'Lamar, get in the car'], // korunan isim
+		['Ask Lucia Carninos', 'Ask Lucia Caminos'], // korunan soyadı, rn → m
+		['WE FLEW TO CAYO PERICO', 'We flew to Cayo Perico'], // tamamı büyük harf
 		['Ill remember you', "I'll remember you"],
 		['Hey,hey.Stop', 'Hey, hey. Stop'],
 		['Weare going', 'We are going'],

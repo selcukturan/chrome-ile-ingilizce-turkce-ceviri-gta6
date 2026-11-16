@@ -9,6 +9,27 @@ Sürüm numarası `package.json` içindeki `version` alanıdır; sayfanın altı
 
 Numaralandırma: hata düzeltmesi → son hane (0.6.**1**), yeni özellik → orta hane (0.**7**.0).
 
+## 0.12.0 — 2026-11-16
+
+- **Sade arayüz:** Her ayarın yanında "!" simgesi var. Üzerine gelince, odaklanınca ya da tıklayınca
+  o bölümü anlatan bir balon açılır. Kamera donanım ayarlarının her biri için de açıklama eklendi.
+- **Geliştirici modu** (sayfanın en altında anahtar): istatistikler, gecikme, tarama aralığı,
+  OCR güveni, yazım düzeltme ve argo ayarları, ek altyazı tipleri ve geçmişteki "çevirmene giden
+  metin" artık yalnızca bu modda görünür. Ayarların kendisi değişmedi.
+- "OCR'a giden görüntü" her açılışta kapalı gelir; kullanıcı gerektiğinde bilerek açar.
+- "Kamera ayarları" bölümü belirgin renkte. Sabit parlaklık/pozlama önerileri kaldırıldı; değerler
+  ortam ışığına göre değiştiği için genel bir ipucu veriliyor.
+- İnce, zemini şeffaf kaydırma çubuğu.
+- Sol panelde "Ön izleme" ve "Alt yazı" başlıkları.
+- **Düzeltme:** Kamera ayarlarında (ör. pozlama süresi) ok tuşuyla azaltmak değeri artırıyordu.
+  Bazı kameralar yazılan değeri farklı bildiriyor (Logitech: 300 → 305); kaydırıcı artık
+  kameradan okunan değeri değil, seçilen değeri gösteriyor.
+- Çeviri sürerken ekranın kararması/uykuya geçmesi engellenir (Screen Wake Lock).
+- Tam ekran çeviriden Esc ile çıkınca siyah ekran kalmıyor.
+- Performans: işleme tuvali ve önizleme her taramada yeniden boyutlandırılmıyor; çeviri
+  başlatılmadan açık olan önizleme de görüntü değişmediyse yeniden hesaplanmıyor.
+- Korunan isimlere yeni karakter ve yer adları eklendi.
+
 ## 0.11.2 — 2026-11-13
 
 - **Kamera öne çıktı:** Sayfa metinleri, SSS, açıklama ve paylaşım görseli (og.png) artık

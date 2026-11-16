@@ -5,6 +5,8 @@
 	// Ekrana bakan kamerada en iyi sonuç: parlaklık yüksek, pozlama düşük (altyazı dışı kararır).
 	// Ayarlar her cihaz için ayrı saklanır ve kamera açılınca tekrar uygulanır.
 	import { oku, yaz } from '#lib/depo.ts';
+	import { KAMERA_BILGI } from '#lib/bilgiler.ts';
+	import Bilgi from './Bilgi.svelte';
 
 	let { iz }: { iz: MediaStreamTrack | null } = $props();
 
@@ -75,7 +77,10 @@
 		if (!iz) return;
 		try {
 			await iz.applyConstraints({ advanced: [degisim as MediaTrackConstraintSet] });
-			deger = { ...deger, ...sec(iz.getSettings()) };
+			// Kaydırıcıda istenen değer gösterilir, kameranın geri bildirdiği değil: bazı kameralar
+			// farklı bildirir (ör. Logitech pozlama süresine 300 yazınca 305 okunur). Okunan değer
+			// gösterilirse ok tuşlarıyla azaltmak bile değeri artırıyordu.
+			deger = { ...deger, ...sec(iz.getSettings()), ...degisim };
 			hata = '';
 			if (kaydet) yaz(anahtar(), { ...oku<Ayarlar>(anahtar(), {}), ...degisim });
 		} catch (e) {
@@ -99,14 +104,18 @@
 
 {#if iz}
 	<details class="kamera-ayar">
-		<summary>Kamera ayarları</summary>
+		<summary>Kamera ayarları <Bilgi baslik="Kamera ayarları" metin={KAMERA_BILGI.genel} /></summary>
 		{#if ayarVar}
 			<p class="ipucu">
-				İpucu: Parlaklığı yükseltip pozlamayı düşürün (testimizde parlaklık 100, pozlama 80). Ekran
-				neredeyse kararır ama beyaz altyazılar net biçimde öne çıkar ve çok daha iyi okunur.
+				İpucu: Parlaklığı yükseltip pozlamayı düşürmeyi deneyin. Amaç, ekranın geri kalanı
+				kararırken beyaz altyazının net kalması. Doğru değerler ortam ışığına ve kameraya göre
+				değişir; ayarlarken "OCR'a giden görüntü"yü açıp sonucu izleyin.
 			</p>
 			{#each modAyarlari as [ad, etiket] (ad)}
-				<label for={'mod-' + ad}>{etiket}</label>
+				<label for={'mod-' + ad}
+					>{etiket}
+					{#if KAMERA_BILGI[ad]}<Bilgi baslik={etiket} metin={KAMERA_BILGI[ad]} />{/if}</label
+				>
 				<select
 					id={'mod-' + ad}
 					value={deger[ad]}
@@ -119,7 +128,11 @@
 			{/each}
 			{#each sayisalAyarlar as [ad, etiket, mod] (ad)}
 				{@const a = yetenek[ad] as Aralik}
-				<label for={'ayar-' + ad}>{etiket} <span class="deger">{deger[ad]}</span></label>
+				<label for={'ayar-' + ad}
+					>{etiket}
+					{#if KAMERA_BILGI[ad]}<Bilgi baslik={etiket} metin={KAMERA_BILGI[ad]} />{/if}
+					<span class="deger">{deger[ad]}</span></label
+				>
 				<input
 					id={'ayar-' + ad}
 					type="range"
@@ -146,13 +159,15 @@
 <style>
 	.kamera-ayar {
 		margin-top: 10px;
-		border: 1px solid var(--line);
+		border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
 		border-radius: 6px;
 		padding: 6px 10px;
+		background: color-mix(in srgb, var(--accent) 8%, transparent);
 	}
 	summary {
 		cursor: pointer;
-		color: var(--muted);
+		color: var(--accent);
+		font-weight: 600;
 		font-size: 12px;
 		text-transform: uppercase;
 		letter-spacing: 0.04em;

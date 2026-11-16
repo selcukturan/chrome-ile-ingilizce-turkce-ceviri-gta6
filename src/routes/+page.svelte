@@ -3,6 +3,8 @@
 	import type { Worker } from 'tesseract.js';
 	import Sayac from '#lib/components/Sayac.svelte';
 	import KameraAyarlari from '#lib/components/KameraAyarlari.svelte';
+	import Bilgi from '#lib/components/Bilgi.svelte';
+	import { BILGI } from '#lib/bilgiler.ts';
 	import { COMMIT, DERLEME, SURUM } from '#lib/surum.ts';
 	import { MIN_CHROME_SURUMU, tarayiciKontrol, type TarayiciDurumu } from '#lib/tarayici.ts';
 	import { cevir, cevirmenHazirla } from '#lib/ceviri.ts';
@@ -39,7 +41,7 @@
 		yazim: true,
 		argo: true,
 		ingilizceGoster: true,
-		onizleme: true, // "OCR'a giden görüntü" göster/gizle
+		gelistirici: false, // istatistikler ve ince ayarlar (sayfanın en altındaki anahtar)
 		kamera: ''
 	};
 	let ayar = $state(oku('ayar', varsayilan));
@@ -76,6 +78,8 @@
 	type Kayit = { tr: string; en: string; giden: string };
 	let gecmis = $state<Kayit[]>([]);
 	let buyukGorunum = $state(false);
+	// "OCR'a giden görüntü": her açılışta kapalı gelir, kullanıcı bilerek açar (saklanmaz)
+	let onizlemeAcik = $state(false);
 
 	let video = $state() as HTMLVideoElement;
 	let bolgeTuval = $state() as HTMLCanvasElement;
@@ -217,6 +221,10 @@
 			/* yoksay */
 		}
 	}
+	// Tam ekrandan Esc ile çıkılınca büyük görünüm de kapanır
+	function tamEkranDegisti() {
+		if (!document.fullscreenElement) buyukGorunum = false;
+	}
 	async function buyukKapat() {
 		buyukGorunum = false;
 		try {
@@ -227,7 +235,7 @@
 	}
 
 	// ---------- "OCR'a giden görüntü" önizlemesi ----------
-	const onizlemeHedef = () => (ayar.onizleme && onizleme ? onizleme : undefined);
+	const onizlemeHedef = () => (onizlemeAcik && onizleme ? onizleme : undefined);
 
 	// OCR'a gönderilen yazı kutusunu kırmızı çerçeveyle gösterir
 	function kutuCiz(k: Kutu) {
@@ -239,15 +247,39 @@
 	}
 
 	// Çeviri çalışmıyorken de önizleme yenilensin (eşiği çeviriyi başlatmadan ayarlamak için)
+	// (görüntü değişmediyse ayıklama tekrarlanmaz; ayar ya da bölge değişince hemen yenilenir)
+	const onizlemeKontrol = new OnKontrol();
 	$effect(() => {
-		if (!kameraAcik || calisiyor || !ayar.onizleme || !onizleme || !isTuvali) return;
+		if (!kameraAcik || calisiyor || !onizlemeAcik || !onizleme || !isTuvali) return;
 		const tuval = isTuvali;
+		onizlemeKontrol.sifirla();
 		const id = setInterval(() => {
+			const anahtar = `${ayar.esik}|${ayar.tip}|${bolge.x},${bolge.y},${bolge.w},${bolge.h}`;
+			if (!onizlemeKontrol.degisti(video, bolge, anahtar)) return;
 			const kare = kareIsle(video, bolge, ayar.esik, ayar.tip, tuval, onizlemeHedef());
 			if (kare) kutuCiz(kare.kutu);
 		}, 200);
 		return () => clearInterval(id);
 	});
+
+	// ---------- Ekran uykusu ----------
+	// Oyun oynarken bilgisayara dokunulmaz; çeviri sürerken ekranın kararması/uykuya geçmesi engellenir.
+	let uyanik: WakeLockSentinel | null = null;
+	async function uyanikTut() {
+		try {
+			if (!calisiyor || uyanik || document.visibilityState !== 'visible' || !navigator.wakeLock)
+				return;
+			uyanik = await navigator.wakeLock.request('screen');
+			uyanik.addEventListener('release', () => (uyanik = null));
+			if (!calisiyor) uyanikBirak(); // istek sürerken durdurulduysa
+		} catch {
+			/* desteklenmiyor ya da izin verilmedi: önemli değil */
+		}
+	}
+	function uyanikBirak() {
+		uyanik?.release().catch(() => {});
+		uyanik = null;
+	}
 
 	// ---------- OCR + ana döngü ----------
 	let isci: Worker | null = null;
@@ -315,7 +347,7 @@
 		try {
 			// Ön kontrol: görüntü son tam işlenen kareden beri değişmediyse ayıklama atlanır,
 			// önceki sonuç kullanılır (aşağıdaki zamanlayıcılar yine işler)
-			const anahtar = `${ayar.esik}|${ayar.tip}|${bolge.x},${bolge.y},${bolge.w},${bolge.h}|${ayar.onizleme}`;
+			const anahtar = `${ayar.esik}|${ayar.tip}|${bolge.x},${bolge.y},${bolge.w},${bolge.h}|${onizlemeAcik}`;
 			let kare: Kare | null;
 			if (!onKontrol.degisti(video, bolge, anahtar) && sonKare) {
 				kare = sonKare;
@@ -433,6 +465,7 @@
 		if (calisiyor) {
 			calisiyor = false;
 			clearTimeout(zamanlayici);
+			uyanikBirak();
 			bildir('Durduruldu.');
 			return;
 		}
@@ -460,6 +493,7 @@
 			onKontrol.sifirla();
 			istat = bosIstatistik();
 			bildir('Çalışıyor…', 'ok');
+			uyanikTut();
 			tarama();
 		} catch (e) {
 			bildir((e as Error).message, 'warn');
@@ -480,6 +514,9 @@
 		let ro: ResizeObserver | undefined;
 		// Cihaz takılıp çıkarıldığında (OBS sanal kamera açılınca vb.) liste kendiliğinden yenilenir
 		navigator.mediaDevices?.addEventListener('devicechange', kameralariListele);
+		document.addEventListener('fullscreenchange', tamEkranDegisti);
+		// Sekme gizlenince kilit düşer; geri gelince yeniden alınır
+		document.addEventListener('visibilitychange', uyanikTut);
 		tick().then(() => {
 			kameralariListele();
 			ro = new ResizeObserver(bolgeCiz);
@@ -487,6 +524,9 @@
 		});
 		return () => {
 			navigator.mediaDevices?.removeEventListener('devicechange', kameralariListele);
+			document.removeEventListener('fullscreenchange', tamEkranDegisti);
+			document.removeEventListener('visibilitychange', uyanikTut);
+			uyanikBirak();
 			ro?.disconnect();
 			calisiyor = false;
 			clearTimeout(zamanlayici);
@@ -580,6 +620,9 @@
 {:else if tarayici?.uygun}
 	<main>
 		<section class="panel">
+			<span class="baslik ilk"
+				>Ön izleme <Bilgi baslik="Ön izleme ve bölge seçimi" metin={BILGI.sahne} /></span
+			>
 			<div class="sahne">
 				<!-- svelte-ignore a11y_media_has_caption -->
 				<video bind:this={video} autoplay playsinline muted onloadedmetadata={bolgeCiz}></video>
@@ -592,57 +635,55 @@
 				></canvas>
 			</div>
 			<p class="ipucu">
-				Fareyle sürükleyerek görüntüde <b>altyazının çıktığı bölgeyi</b> seçin. Bölge ne kadar dar olursa
-				OCR o kadar hızlı ve doğru çalışır.
+				Fareyle sürükleyerek görüntüde <b>altyazının çıktığı bölgeyi</b> seçin.
 			</p>
+			<span class="baslik">Alt yazı <Bilgi baslik="Alt yazı" metin={BILGI.altyazi} /></span>
 			<div class="altyazi">
 				<div class="tr">{tr || '—'}</div>
 				{#if ayar.ingilizceGoster}<div class="en">{en}</div>{/if}
 			</div>
 
 			<div class="onizleme-baslik">
-				<span class="baslik">OCR'a giden görüntü</span>
-				<button class="ikincil kucuk" onclick={() => (ayar.onizleme = !ayar.onizleme)}>
-					{ayar.onizleme ? 'Gizle' : 'Göster'}
+				<span class="baslik"
+					>OCR'a giden görüntü <Bilgi baslik="OCR'a giden görüntü" metin={BILGI.onizleme} /></span
+				>
+				<button class="ikincil kucuk" onclick={() => (onizlemeAcik = !onizlemeAcik)}>
+					{onizlemeAcik ? 'Gizle' : 'Göster'}
 				</button>
 			</div>
-			{#if ayar.onizleme}
+			{#if onizlemeAcik}
 				<canvas bind:this={onizleme} class="onizleme"></canvas>
 				<p class="ipucu">
-					Yazı <b>beyaz zemin üstünde siyah</b> ve net görünmeli; başka siyah lekeler olmamalı.
-					Olmuyorsa
-					<b>Parlaklık eşiği</b> veya <b>Altyazı tipi</b>ni değiştirin.
+					Yazı <b>beyaz zemin üstünde siyah</b> ve net görünmeli.
 					<span class="kirmizi">Kırmızı çerçeve</span>: OCR'a gönderilen alan.
 				</p>
 			{/if}
-			{#if sure.ocr}
-				<p class="ipucu sure">Son altyazı: OCR {sure.ocr} ms · çeviri {sure.ceviri} ms</p>
-			{/if}
-			{#if istat.tur}
-				<p
-					class="ipucu sure"
-					title="Tarama: kare kontrolü · Bekleme: görüntü durulana kadar · OCR: yazı okuma · Tekrar/düşük: okunan ama çevrilmeyen"
-				>
-					{istat.tur} tarama ({istat.atlama} değişmedi) · {istat.bekleme} bekleme · {istat.ocr} OCR (ort.
-					{istat.ocr ? Math.round(istat.ocrMs / istat.ocr) : 0} ms) · {istat.tekrar} tekrar · {istat.dusuk}
-					düşük güven · {istat.ceviri} çeviri
-				</p>
-				{#if istat.gecikmeler.length}
-					<p
-						class="ipucu sure"
-						title="Ekrandaki yazının değiştiği algılandıktan çevirinin ekrana gelmesine kadar geçen süre (son 100 altyazı)"
-					>
-						Gecikme: ortanca {yuzdelik(istat.gecikmeler, 0.5)} ms · en kötü {yuzdelik(
-							istat.gecikmeler,
-							1
-						)} ms
+			{#if ayar.gelistirici}
+				{#if sure.ocr}
+					<p class="ipucu sure">Son altyazı: OCR {sure.ocr} ms · çeviri {sure.ceviri} ms</p>
+				{/if}
+				{#if istat.tur}
+					<p class="ipucu sure">
+						{istat.tur} tarama ({istat.atlama} değişmedi) · {istat.bekleme} bekleme · {istat.ocr} OCR
+						(ort.
+						{istat.ocr ? Math.round(istat.ocrMs / istat.ocr) : 0} ms) · {istat.tekrar} tekrar · {istat.dusuk}
+						düşük güven · {istat.ceviri} çeviri
+						<Bilgi baslik="İstatistikler" metin={BILGI.istat} />
 					</p>
+					{#if istat.gecikmeler.length}
+						<p class="ipucu sure">
+							Gecikme: ortanca {yuzdelik(istat.gecikmeler, 0.5)} ms · en kötü {yuzdelik(
+								istat.gecikmeler,
+								1
+							)} ms
+						</p>
+					{/if}
 				{/if}
 			{/if}
 		</section>
 
 		<aside class="panel">
-			<label for="kamera">Kamera</label>
+			<label for="kamera">Kamera <Bilgi baslik="Kamera" metin={BILGI.kamera} /></label>
 			<div class="secim">
 				<select id="kamera" bind:value={ayar.kamera} onchange={() => akis && kameraBaslat()}>
 					<option value="">Varsayılan kamera</option>
@@ -654,7 +695,7 @@
 					class="ikincil yenile"
 					onclick={kameralariYenile}
 					disabled={yenileniyor}
-					title="Kamera listesini yenile (sonradan bağlanan OBS sanal kamera, capture kart)"
+					title="Kamera listesini yenile"
 					aria-label="Kamera listesini yenile">⟳</button
 				>
 			</div>
@@ -666,50 +707,77 @@
 					{calisiyor ? 'Durdur' : 'Çeviriyi başlat'}
 				</button>
 			</div>
+			<p class="ipucu">
+				Önce kamerayı, sonra çeviriyi başlatın.
+				<Bilgi baslik="Başlatma" metin={BILGI.baslat} />
+			</p>
 			<KameraAyarlari {iz} />
 
-			<label for="tip">Altyazı tipi</label>
+			<label for="tip">Altyazı tipi <Bilgi baslik="Altyazı tipi" metin={BILGI.tip} /></label>
 			<select id="tip" bind:value={ayar.tip} onchange={() => (sonImza = null)}>
-				<option value="white">Beyaz yazı (PS5 varsayılanı)</option>
-				<option value="white-basit">Beyaz yazı, basit (konturu olmayan yazı için)</option>
+				<option value="white">Beyaz yazı (çoğu oyun)</option>
 				<option value="yellow">Sarı yazı</option>
 				<option value="dark">Koyu yazı, açık zemin</option>
-				<option value="none">İşlem yok (sadece gri)</option>
+				{#if ayar.gelistirici || ayar.tip === 'white-basit'}
+					<option value="white-basit">Beyaz yazı, basit (konturu olmayan yazı için)</option>
+				{/if}
+				{#if ayar.gelistirici || ayar.tip === 'none'}
+					<option value="none">İşlem yok (sadece gri)</option>
+				{/if}
 			</select>
 
-			<label for="esik">Parlaklık eşiği <span class="deger">{ayar.esik}</span></label>
+			<label for="esik"
+				>Parlaklık eşiği <Bilgi baslik="Parlaklık eşiği" metin={BILGI.esik} />
+				<span class="deger">{ayar.esik}</span></label
+			>
 			<input id="esik" type="range" min="80" max="250" bind:value={ayar.esik} />
 
-			<label for="aralik">Tarama aralığı <span class="deger">{ayar.aralik} ms</span></label>
-			<input id="aralik" type="range" min="100" max="2000" step="50" bind:value={ayar.aralik} />
-
-			<label for="guven">Min. OCR güveni <span class="deger">%{ayar.minGuven}</span></label>
-			<input id="guven" type="range" min="0" max="95" bind:value={ayar.minGuven} />
-
-			<label class="kutu">
-				<input type="checkbox" bind:checked={ayar.yazim} onchange={yazimDegisti} /> OCR yazım hatalarını
-				düzelt
-			</label>
-			<label class="kutu">
-				<input type="checkbox" bind:checked={ayar.argo} onchange={() => (sonMetin = '')} /> Argoyu
-				sadeleştir
-				<small>({argoKuralSayisi} kural)</small>
-			</label>
 			<label class="kutu">
 				<input type="checkbox" bind:checked={ayar.ingilizceGoster} /> İngilizce metni de göster
+				<Bilgi baslik="İngilizce metin" metin={BILGI.ingilizce} />
 			</label>
 
-			<div class="satir">
+			<div class="satir tam-ekran">
 				<button class="ikincil" onclick={buyukAc}>Tam ekran çeviri</button>
+				<Bilgi baslik="Tam ekran çeviri" metin={BILGI.tamEkran} />
 			</div>
 
-			<span class="baslik">Geçmiş</span>
+			{#if ayar.gelistirici}
+				<div class="gelismis">
+					<span class="baslik">Geliştirici ayarları</span>
+					<label for="aralik"
+						>Tarama aralığı <Bilgi baslik="Tarama aralığı" metin={BILGI.aralik} />
+						<span class="deger">{ayar.aralik} ms</span></label
+					>
+					<input id="aralik" type="range" min="100" max="2000" step="50" bind:value={ayar.aralik} />
+
+					<label for="guven"
+						>Min. OCR güveni <Bilgi baslik="Min. OCR güveni" metin={BILGI.guven} />
+						<span class="deger">%{ayar.minGuven}</span></label
+					>
+					<input id="guven" type="range" min="0" max="95" bind:value={ayar.minGuven} />
+
+					<label class="kutu">
+						<input type="checkbox" bind:checked={ayar.yazim} onchange={yazimDegisti} /> OCR yazım
+						hatalarını düzelt
+						<Bilgi baslik="Yazım düzeltme" metin={BILGI.yazim} />
+					</label>
+					<label class="kutu">
+						<input type="checkbox" bind:checked={ayar.argo} onchange={() => (sonMetin = '')} />
+						Argoyu sadeleştir <small>({argoKuralSayisi} kural)</small>
+						<Bilgi baslik="Argo" metin={BILGI.argo} />
+					</label>
+				</div>
+			{/if}
+
+			<span class="baslik">Geçmiş <Bilgi baslik="Geçmiş" metin={BILGI.gecmis} /></span>
 			<div class="gecmis">
 				{#each gecmis as g, i (i)}
 					<div>
 						<span>{g.tr}</span><small>{g.en}</small>
-						{#if g.giden !== g.en}<small class="giden" title="Çevirmene giden metin (argo sonrası)"
-								>→ {g.giden}</small
+						{#if ayar.gelistirici && g.giden !== g.en}<small
+								class="giden"
+								title="Çevirmene giden metin (argo sonrası)">→ {g.giden}</small
 							>{/if}
 					</div>
 				{/each}
@@ -736,8 +804,9 @@
 			ya da DroidCam / Camo gibi uygulamalarla). Capture kart da kullanılabilir.
 		</li>
 		<li>
-			<b>Kamera ayarları</b>'nda parlaklığı yükseltip pozlamayı düşürün (testimizde parlaklık 200,
-			pozlama 120): ekran neredeyse kararır, altyazılar net biçimde öne çıkar. Yine de kendi en iyi alt yazı görünümünüz için ayarları deneyin.
+			<b>Kamera ayarları</b>'nda parlaklığı yükseltip pozlamayı düşürmeyi deneyin: ekranın geri
+			kalanı kararırken altyazı net biçimde öne çıkar. Doğru değerler ortam ışığına ve kameraya göre
+			değişir; <b>OCR'a giden görüntü</b>yü açıp sonucu izleyerek ayarlayın.
 		</li>
 		<li>Oyunda altyazıları açın (Ayarlar → Ses ve Altyazılar).</li>
 		<li>
@@ -780,6 +849,14 @@
 <footer class="alt">
 	<Sayac />
 	<span class="surum" title="Derleme: {DERLEME}">Sürüm {SURUM}{COMMIT ? ` · ${COMMIT}` : ''}</span>
+	{#if tarayici?.uygun}
+		<label class="anahtar">
+			<input type="checkbox" role="switch" bind:checked={ayar.gelistirici} />
+			<span class="ray" aria-hidden="true"></span>
+			Geliştirici modu
+			<Bilgi baslik="Geliştirici modu" metin={BILGI.gelistirici} />
+		</label>
+	{/if}
 </footer>
 
 <style>
@@ -857,7 +934,7 @@
 		text-align: right;
 	}
 	.altyazi {
-		margin-top: 14px;
+		margin-top: 4px;
 		min-height: 120px;
 		padding: 18px;
 		background: #000;
@@ -1075,6 +1152,70 @@
 		gap: 6px;
 		padding: 16px 16px 28px;
 		border-top: 1px solid var(--line);
+	}
+	.baslik.ilk {
+		margin-top: 0;
+	}
+	.tam-ekran {
+		align-items: center;
+	}
+	.tam-ekran > :global(.bilgi) {
+		flex: 0;
+	}
+	.gelismis {
+		margin-top: 14px;
+		padding: 4px 10px 10px;
+		border: 1px dashed var(--line);
+		border-radius: 6px;
+	}
+	.anahtar {
+		display: inline-flex;
+		align-items: center;
+		gap: 8px;
+		margin: 4px 0 0;
+		color: var(--muted);
+		font-size: 12px;
+		text-transform: none;
+		letter-spacing: 0;
+		cursor: pointer;
+	}
+	.anahtar input {
+		position: absolute;
+		opacity: 0;
+		width: 1px;
+		height: 1px;
+	}
+	.ray {
+		position: relative;
+		width: 30px;
+		height: 16px;
+		border-radius: 8px;
+		background: var(--line);
+		transition: background 0.15s;
+	}
+	.ray::after {
+		content: '';
+		position: absolute;
+		top: 2px;
+		left: 2px;
+		width: 12px;
+		height: 12px;
+		border-radius: 50%;
+		background: var(--muted);
+		transition:
+			transform 0.15s,
+			background 0.15s;
+	}
+	.anahtar input:checked + .ray {
+		background: var(--accent);
+	}
+	.anahtar input:checked + .ray::after {
+		transform: translateX(14px);
+		background: #fff;
+	}
+	.anahtar input:focus-visible + .ray {
+		outline: 2px solid var(--accent);
+		outline-offset: 2px;
 	}
 	.surum {
 		color: var(--muted);

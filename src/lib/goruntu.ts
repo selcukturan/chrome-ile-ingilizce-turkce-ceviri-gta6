@@ -9,6 +9,11 @@ export type Kutu = { left: number; top: number; width: number; height: number };
 /** boy: ayıklamanın ölçtüğü harf boyu (px, işleme tuvalinde); bilinmiyorsa 0 */
 export type Kare = { murekkep: number; imza: Imza; kutu: Kutu; boy: number };
 
+function boyutla(t: HTMLCanvasElement, w: number, h: number) {
+	if (t.width !== w) t.width = w;
+	if (t.height !== h) t.height = h;
+}
+
 const KUTU_PAYI = 16; // yazı kutusunun kenarına bırakılan boşluk (kelime kesilmesin)
 
 export function kareIsle(
@@ -28,8 +33,8 @@ export function kareIsle(
 		sw = bolge.w * vw,
 		sh = bolge.h * vh;
 	const olcek = Math.min(3, Math.max(1, 120 / Math.max(1, sh / 2))); // satır başına ~60px+ hedefi
-	is.width = Math.round(sw * olcek);
-	is.height = Math.round(sh * olcek);
+	// Tuvale boyut atamak (aynı boyut olsa da) onu sıfırlar ve belleği yeniden ayırır: sadece değişince
+	boyutla(is, Math.round(sw * olcek), Math.round(sh * olcek));
 	ctx.imageSmoothingQuality = 'high';
 	ctx.drawImage(video, sx, sy, sw, sh, 0, 0, is.width, is.height);
 
@@ -85,8 +90,7 @@ export function kareIsle(
 	ctx.putImageData(img, 0, 0);
 
 	if (onizleme) {
-		onizleme.width = is.width;
-		onizleme.height = is.height;
+		boyutla(onizleme, is.width, is.height);
 		onizleme.getContext('2d')!.drawImage(is, 0, 0);
 	}
 	// OCR'a sadece yazının bulunduğu kutu gönderilir (işlenecek piksel azalır)

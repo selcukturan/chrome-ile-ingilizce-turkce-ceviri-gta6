@@ -23,6 +23,11 @@
 		--warn: #f5a524;
 		color-scheme: dark;
 	}
+	/* İnce kaydırma çubuğu (sayfa ve geçmiş listesi): zemin şeffaf, çubuk panel çizgileriyle uyumlu */
+	:global(*) {
+		scrollbar-width: thin;
+		scrollbar-color: #3a4150 transparent;
+	}
 	:global(*) {
 		box-sizing: border-box;
 	}
